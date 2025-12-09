@@ -1,0 +1,3 @@
+-- CREATE DATABASE pgk_food;
+-- INSERT INTO users (id, login, password_hash, role, name, surname)
+-- VALUES ("uuid-1","oleg","$2a$12$SdxOWmwo3EC5ePbG6Bd4gexRltEyfwezigD5lP8tPVIr1IeiMTxd.","ADMIN", "Олег", "Владиславович")

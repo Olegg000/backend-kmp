@@ -1,0 +1,21 @@
+
+services:
+
+
+  postgres:
+    image: postgres:17.0
+    restart: "no"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql-scripts/:/docker-entrypoint-initdb.d/
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: P@ssw0rd
+      POSTGRES_DB: pgk_food
+    healthcheck:
+      test: pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
