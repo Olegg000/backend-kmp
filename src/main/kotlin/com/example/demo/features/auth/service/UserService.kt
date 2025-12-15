@@ -2,8 +2,10 @@ package com.example.demo.features.auth.service
 
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
+import com.example.demo.core.database.entity.PasswordResetLogEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
+import com.example.demo.core.database.repository.PasswordResetLogRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
 import com.example.demo.core.util.CryptoUtils
@@ -22,6 +24,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
 import java.util.UUID
 
 @Service
@@ -31,6 +34,7 @@ class UserServiceQ(
     private val jwtUtils: JwtUtils,
     private val passwordEncoder: PasswordEncoder,
     private val groupRepository: GroupRepository,
+    private val passwordResetLogRepository: PasswordResetLogRepository,
 ) {
     @Autowired
     private lateinit var passwordGenerator: PasswordGenerator
@@ -83,9 +87,16 @@ class UserServiceQ(
 
         return AuthReturns(
             token = token,
-            roles = user.roles.map { it.name }, // Превращаем Enum в строки
+            roles = user.roles.map { it.name },
             privateKey = user.encryptedPrivateKey!!,
-            publicKey = user.publicKey!!
+            publicKey = user.publicKey!!,
+
+            userId = user.id!!,
+            login = user.login,
+            name = user.name,
+            surname = user.surname,
+            fatherName = user.fatherName,
+            groupId = user.group?.id
         )
     }
 
@@ -163,20 +174,34 @@ class UserServiceQ(
         )
     }
 
-    // СБРОС ПАРОЛЯ (Если студент забыл)
     @Transactional
-    fun resetPassword(userId: UUID): UserCredentialsResponse {
+    fun resetPassword(userId: UUID, requestedByLogin: String? = null): UserCredentialsResponse {
         val user = userRepository.findByIdOrNull(userId)
             ?: throw RuntimeException("User not found")
 
+        val now = LocalDateTime.now()
+        val start = now.minusDays(1)
+
+        val resetCount = passwordResetLogRepository.countByUserAndTimestampBetween(user, start, now)
+        if (resetCount >= 3) {
+            throw RuntimeException("Слишком много попыток сброса пароля за последние 24 часа")
+        }
+
         val newPassword = passwordGenerator.generatePassword(8)
         user.passwordHash = passwordEncoder.encode(newPassword)
-        // Ключи шифрования при смене пароля лучше не трогать,
-        // ИЛИ перешифровывать приватный ключ (это сложная тема).
-        // Для MVP: если студент забыл пароль, старые QR перестанут работать,
-        // так как он получит новый ключ при логине (см. логику auth).
-
         userRepository.save(user)
+
+        val resetByUser = requestedByLogin?.let { login ->
+            userRepository.findByLogin(login)
+        }
+
+        passwordResetLogRepository.save(
+            PasswordResetLogEntity(
+                user = user,
+                resetBy = resetByUser,
+                timestamp = now
+            )
+        )
 
         return UserCredentialsResponse(
             userId = user.id!!,
@@ -185,7 +210,6 @@ class UserServiceQ(
             fullName = "${user.surname} ${user.name}"
         )
     }
-
 
     @Transactional
     fun importStudentsFromCsv(csvContent: String) {

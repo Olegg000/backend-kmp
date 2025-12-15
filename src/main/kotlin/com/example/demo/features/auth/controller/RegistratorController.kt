@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 import java.nio.charset.StandardCharsets
+import java.security.Principal
 import java.util.UUID
 
 @RestController
@@ -39,9 +40,11 @@ class RegistratorController(
 
     @PostMapping("/users/{userId}/reset-password")
     @PreAuthorize("hasAnyRole('REGISTRATOR', 'ADMIN')")
-    @Operation(summary = "Сгенерировать новый пароль пользователю")
-    fun resetPass(@PathVariable userId: UUID): UserCredentialsResponse {
-        return userService.resetPassword(userId)
+    fun resetPass(
+        @PathVariable userId: UUID,
+        principal: Principal
+    ): UserCredentialsResponse {
+        return userService.resetPassword(userId, principal.name)
     }
 
 

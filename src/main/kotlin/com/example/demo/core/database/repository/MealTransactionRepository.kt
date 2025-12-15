@@ -12,7 +12,6 @@ import java.util.UUID
 
 interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> {
 
-    // Проверка: ел ли студент этот тип еды в этот промежуток времени?
     fun existsByStudentAndMealTypeAndTimeStampBetween(
         student: UserEntity,
         mealType: MealType,
@@ -20,17 +19,14 @@ interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> 
         end: LocalDateTime
     ): Boolean
 
-    // Проверка по хэшу (защита от дублей при повторной отправке одного и того же пакета)
     fun existsByTransactionHash(hash: String): Boolean
 
-    // Найти все транзакции студента за период
     fun findAllByStudentAndTimeStampBetween(
         student: UserEntity,
         start: LocalDateTime,
         end: LocalDateTime
     ): List<MealTransactionEntity>
 
-    // Статистика: сколько студентов поело по типу еды за день
     @Query("""
         SELECT COUNT(DISTINCT t.student.id) 
         FROM MealTransactionEntity t 
@@ -43,7 +39,7 @@ interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> 
         @Param("end") end: LocalDateTime
     ): Long
 
-    // Найти все транзакции за день (для отчетов)
+    // ← этот метод больше не будем использовать в отчетах, но можно оставить
     @Query("""
         SELECT t FROM MealTransactionEntity t 
         WHERE DATE(t.timeStamp) = :date 
@@ -51,7 +47,6 @@ interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> 
     """)
     fun findAllByDate(@Param("date") date: LocalDate): List<MealTransactionEntity>
 
-    // Найти транзакции студента за конкретный день
     @Query("""
         SELECT t FROM MealTransactionEntity t 
         WHERE t.student = :student 
@@ -60,5 +55,11 @@ interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> 
     fun findAllByStudentAndDate(
         @Param("student") student: UserEntity,
         @Param("date") date: LocalDate
+    ): List<MealTransactionEntity>
+
+    // НОВЫЙ метод — для отчетов
+    fun findAllByTimeStampBetween(
+        start: LocalDateTime,
+        end: LocalDateTime
     ): List<MealTransactionEntity>
 }

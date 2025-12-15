@@ -1,5 +1,6 @@
 package com.example.demo.features.qr.service
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
@@ -25,7 +26,7 @@ import java.time.LocalDateTime
 
 @DataJpaTest
 @Import(QRValidationService::class, QRCodeService::class)
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("QRValidation - Integration Tests (полный цикл)")
 class QRValidationIntegrationTest {
 

@@ -1,5 +1,6 @@
 package com.example.demo.features.qr.controller
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.UserEntity
@@ -26,7 +27,7 @@ import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @Transactional
 @DisplayName("QRController - REST API Tests")
 class QRControllerTest {

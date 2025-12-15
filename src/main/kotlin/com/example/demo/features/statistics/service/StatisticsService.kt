@@ -5,6 +5,7 @@ import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.statistics.dto.StudentMealStatus
 import org.springframework.stereotype.Service
+import com.example.demo.core.database.Role
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -22,6 +23,7 @@ class StatisticsService(
             ?: throw RuntimeException("Куратор не привязан к группе")
 
         val students = userRepository.findAllByGroup(group)
+            .filter { it.roles.contains(Role.STUDENT) }
 
         val startOfDay = date.atStartOfDay()
         val endOfDay = date.atTime(LocalTime.MAX)

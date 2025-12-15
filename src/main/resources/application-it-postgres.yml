@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/pgk_food_test
+    driver-class-name: org.postgresql.Driver
+    username: postgres
+    password: P@ssw0rd
+
+  jpa:
+    hibernate:
+      ddl-auto: update  # для интеграций можно update; в проде лучше validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: false
+
+  sql:
+    init:
+      mode: never
+
+jwt:
+  secret: TestSecretKeyForPostgresIT_ChangeMe
+  lifetime: 86400000
+
+logging:
+  level:
+    root: INFO
+    com.example.demo: DEBUG

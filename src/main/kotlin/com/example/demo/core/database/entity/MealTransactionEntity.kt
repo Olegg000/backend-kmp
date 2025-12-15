@@ -21,7 +21,7 @@ class MealTransactionEntity (
     @Column(name = "transaction_hash", nullable = false)
     val transactionHash: String,
 
-    @Column(name = "timestamp", nullable = false)
+    @Column(name = "meal_timestamp", nullable = false)
     val timeStamp: LocalDateTime,
 
     @ManyToOne
@@ -35,5 +35,4 @@ class MealTransactionEntity (
 
     @Column(name = "meal_type", nullable = false)
     val mealType: MealType
-
 )

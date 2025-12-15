@@ -1,5 +1,6 @@
 package com.example.demo.features.roster.service
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
@@ -20,7 +21,7 @@ import java.time.LocalDate
 
 @DataJpaTest
 @Import(RosterService::class)
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("RosterService - Управление табелем питания")
 class RosterServiceTest {
 
@@ -44,7 +45,7 @@ class RosterServiceTest {
     @BeforeEach
     fun setup() {
         // Создаем группу
-        group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "ИСП-21", curator = null))
 
         // Создаем куратора
         curator = userRepository.save(

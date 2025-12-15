@@ -1,5 +1,6 @@
 package com.example.demo.features.reports.service
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.MealTransactionEntity
@@ -20,7 +21,7 @@ import java.time.LocalTime
 
 @DataJpaTest
 @Import(ReportsService::class)
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("ReportsService - Отчетность")
 class ReportsServiceTest {
 

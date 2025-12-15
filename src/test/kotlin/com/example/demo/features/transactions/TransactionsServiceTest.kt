@@ -1,5 +1,6 @@
 package com.example.demo.features.transactions.service
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
@@ -8,6 +9,7 @@ import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
+import com.example.demo.core.database.repository.SuspiciousTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.transactions.dto.TransactionSyncItem
 import org.junit.jupiter.api.Assertions.*
@@ -24,7 +26,7 @@ import java.util.UUID
 
 @DataJpaTest
 @Import(TransactionsService::class)
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("TransactionsService - Защита от двойного прохода")
 class TransactionsServiceTest {
 
@@ -42,6 +44,9 @@ class TransactionsServiceTest {
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
+
+    @Autowired
+    private lateinit var suspiciousRepo: SuspiciousTransactionRepository
 
     private lateinit var student: UserEntity
     private lateinit var chef: UserEntity
@@ -108,6 +113,35 @@ class TransactionsServiceTest {
                 isSpecialAllowed = false
             )
         )
+    }
+
+
+    @Test
+    @DisplayName("Подозрительная транзакция создается при повторной попытке")
+    fun `double spending should create suspicious record`() {
+        // Given — первая успешная транзакция
+        val item = TransactionSyncItem(
+            studentId = student.id!!,
+            timestamp = LocalDateTime.now(),
+            mealType = MealType.LUNCH,
+            transactionHash = "tx-1"
+        )
+        transactionsService.syncBatch(chef.login, listOf(item))
+
+        // When — повторная попытка
+        val item2 = TransactionSyncItem(
+            studentId = student.id!!,
+            timestamp = LocalDateTime.now(),
+            mealType = MealType.LUNCH,
+            transactionHash = "tx-2"
+        )
+        transactionsService.syncBatch(chef.login, listOf(item2))
+
+        // Then — в suspicious таблице должна появиться запись
+        val all = suspiciousRepo.findAll()
+        assertEquals(1, all.size)
+        assertEquals(MealType.LUNCH, all[0].mealType)
+        assertEquals("ALREADY_ATE", all[0].reason)
     }
 
     @Test

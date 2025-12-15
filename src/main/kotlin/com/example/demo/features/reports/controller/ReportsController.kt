@@ -1,6 +1,7 @@
 package com.example.demo.features.reports.controller
 
 import com.example.demo.features.reports.dto.DailyReportResponse
+import com.example.demo.features.reports.service.ReportsPdfService
 import com.example.demo.features.reports.service.ReportsService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -18,7 +19,8 @@ import java.time.LocalDate
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Reports", description = "Отчетность для администрации")
 class ReportsController(
-    private val reportsService: ReportsService
+    private val reportsService: ReportsService,
+    private val reportsPdfService: ReportsPdfService
 ) {
 
     @GetMapping("/daily")
@@ -52,5 +54,20 @@ class ReportsController(
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report_${startDate}_${endDate}.csv")
             .contentType(MediaType.parseMediaType("text/csv"))
             .body(csv.toByteArray())
+    }
+
+    @GetMapping("/export/pdf")
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
+    @Operation(summary = "Экспорт отчета в PDF")
+    fun exportPdf(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate
+    ): ResponseEntity<ByteArray> {
+        val pdf = reportsPdfService.generatePdf(startDate, endDate)
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report_${startDate}_${endDate}.pdf")
+            .contentType(MediaType.APPLICATION_PDF)
+            .body(pdf)
     }
 }

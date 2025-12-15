@@ -1,5 +1,6 @@
 package com.example.demo.features.roster.service
 
+import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
@@ -27,8 +28,9 @@ class RosterService(
         val group = curator.group
             ?: throw RuntimeException("Куратор не привязан к группе")
 
-        // Находим студентов ТОЛЬКО из этой группы
+        // Находим студентов ТОЛЬКО из этой группы (куратор в табель не попадает)
         val students = userRepository.findAllByGroup(group)
+            .filter { it.roles.contains(Role.STUDENT) }
 
         // 2. Генерируем даты (например, пн-пт)
         val dates = (0..4).map { startDate.plusDays(it.toLong()) } // 5 дней
@@ -71,7 +73,8 @@ class RosterService(
 
             // Логика: Если галочки сняты - удаляем запись или ставим false?
             // Лучше так: если все false - удаляем запись (чистим БД).
-            if (!dto.isBreakfast && !dto.isLunch && !dto.isDinner) {
+            if (!dto.isBreakfast && !dto.isLunch && !dto.isDinner &&
+                !dto.isSnack && !dto.isSpecial) {
                 if (existing != null) permissionRepository.delete(existing)
                 return@forEach
             }
@@ -83,8 +86,10 @@ class RosterService(
                 existing.isBreakfastAllowed = dto.isBreakfast
                 existing.isLunchAllowed = dto.isLunch
                 existing.isDinnerAllowed = dto.isDinner
+                existing.isSnackAllowed = dto.isSnack
+                existing.isSpecialAllowed = dto.isSpecial
                 existing.reason = reasonText
-                // existing.assignedBy = assigner // Можно обновлять, кто изменил последним
+                // existing.assignedBy = assigner
                 permissionRepository.save(existing)
             } else {
                 permissionRepository.save(
@@ -95,7 +100,9 @@ class RosterService(
                         reason = reasonText,
                         isBreakfastAllowed = dto.isBreakfast,
                         isLunchAllowed = dto.isLunch,
-                        isDinnerAllowed = dto.isDinner
+                        isDinnerAllowed = dto.isDinner,
+                        isSnackAllowed = dto.isSnack,
+                        isSpecialAllowed = dto.isSpecial
                     )
                 )
             }

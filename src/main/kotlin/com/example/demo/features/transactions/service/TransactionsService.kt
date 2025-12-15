@@ -2,9 +2,11 @@ package com.example.demo.features.transactions.service
 
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.entity.MealTransactionEntity
+import com.example.demo.core.database.entity.SuspiciousTransactionEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
+import com.example.demo.core.database.repository.SuspiciousTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.transactions.dto.SyncResponse
 import com.example.demo.features.transactions.dto.TransactionSyncItem
@@ -18,7 +20,8 @@ import kotlin.jvm.optionals.getOrNull
 class TransactionsService(
     private val transactionRepository: MealTransactionRepository,
     private val permissionRepository: MealPermissionRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val suspiciousTransactionRepository: SuspiciousTransactionRepository
 ) {
 
     // Принимаем логин повара (кто отправил) и список транзакций
@@ -64,6 +67,22 @@ class TransactionsService(
             student, item.mealType, startOfDay, endOfDay
         )
         if (alreadyAte) {
+            val existing = transactionRepository.findAllByStudentAndTimeStampBetween(
+                student, startOfDay, endOfDay
+            ).firstOrNull { it.mealType == item.mealType }
+
+            suspiciousTransactionRepository.save(
+                SuspiciousTransactionEntity(
+                    student = student,
+                    chef = chef,
+                    date = dateOfMeal,
+                    mealType = item.mealType,
+                    reason = "ALREADY_ATE",
+                    baseTransactionHash = existing?.transactionHash,
+                    attemptTransactionHash = item.transactionHash
+                )
+            )
+
             throw RuntimeException("Студент уже получил ${item.mealType} за эту дату!")
         }
 

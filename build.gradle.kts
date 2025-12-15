@@ -44,6 +44,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
 
     implementation("com.ibm.icu:icu4j:73.2")
+    implementation("com.github.librepdf:openpdf:1.3.39")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")

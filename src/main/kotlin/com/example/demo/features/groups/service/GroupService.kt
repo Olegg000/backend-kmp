@@ -44,7 +44,8 @@ class GroupService(
             ?: throw RuntimeException("Пользователь не найден")
 
         // Валидация: А точно ли это куратор?
-        if (user.roles.any {  it != Role.CURATOR } && user.roles.any { it != Role.ADMIN }) {
+        // Валидация: должен быть CURATOR или ADMIN (допустимы комбинированные роли)
+        if (!user.roles.contains(Role.CURATOR) && !user.roles.contains(Role.ADMIN)) {
             throw RuntimeException("Пользователь не имеет роли CURATOR")
         }
 
@@ -71,7 +72,8 @@ class GroupService(
         val student = userRepository.findByIdOrNull(studentId)
             ?: throw RuntimeException("Студент не найден")
 
-        if (student.roles.any {it != Role.STUDENT }) {
+        // Должна быть роль STUDENT (может быть в комбинации с другими)
+        if (!student.roles.contains(Role.STUDENT)) {
             throw RuntimeException("Можно добавлять только студентов")
         }
 

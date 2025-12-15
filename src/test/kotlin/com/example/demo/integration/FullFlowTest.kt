@@ -1,5 +1,6 @@
 package com.example.demo.integration
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
@@ -29,6 +30,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
  * Полный сценарий работы системы:
@@ -39,7 +41,7 @@ import java.time.LocalDateTime
  * 5. Проверка защиты от двойного прохода
  */
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @Transactional
 @DisplayName("Full Flow Test - Полный цикл работы системы")
 class FullFlowTest {
@@ -230,8 +232,17 @@ class FullFlowTest {
 
         // === ИТОГ ===
         println("\n=== ИТОГ: Полный цикл выполнен успешно! ===")
-        val savedTx = transactionRepository.findAll()
-        assertEquals(1, savedTx.size, "В базе должна быть ровно 1 транзакция")
+        val startOfDay = today.atStartOfDay()
+        val endOfDay = today.atTime(LocalTime.MAX)
+
+        // Берем только транзакции ЭТОГО студента за сегодня
+        val savedTx = transactionRepository.findAllByStudentAndTimeStampBetween(
+            student,
+            startOfDay,
+            endOfDay
+        )
+        assertEquals(1, savedTx.size, "Для студента должна быть ровно 1 транзакция за сегодня")
+        assertEquals(mealType, savedTx[0].mealType)
     }
 
     @Test
@@ -320,4 +331,5 @@ class FullFlowTest {
 
         println("✅ Устаревший QR отклонён: QR_EXPIRED")
     }
+
 }

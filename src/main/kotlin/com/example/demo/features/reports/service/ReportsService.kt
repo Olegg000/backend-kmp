@@ -6,6 +6,7 @@ import com.example.demo.features.reports.dto.DailyReportResponse
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
+import com.example.demo.core.database.Role
 
 @Service
 class ReportsService(
@@ -15,6 +16,8 @@ class ReportsService(
     fun generateDailyReport(date: LocalDate): DailyReportResponse {
         val startOfDay = date.atStartOfDay()
         val endOfDay = date.atTime(LocalTime.MAX)
+
+        val transactions = transactionRepository.findAllByTimeStampBetween(startOfDay, endOfDay)
 
         return DailyReportResponse(
             date = date,
@@ -33,8 +36,8 @@ class ReportsService(
             specialCount = transactionRepository.countUniqueStudentsByMealTypeAndDate(
                 MealType.SPECIAL, startOfDay, endOfDay
             ),
-            totalCount = transactionRepository.findAllByDate(date).distinctBy { it.student.id }.size.toLong(),
-            offlineTransactions = transactionRepository.findAllByDate(date).count { it.isOffline }.toLong()
+            totalCount = transactions.distinctBy { it.student.id }.size.toLong(),
+            offlineTransactions = transactions.count { it.isOffline }.toLong()
         )
     }
 
