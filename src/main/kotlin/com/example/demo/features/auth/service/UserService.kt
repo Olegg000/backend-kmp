@@ -11,6 +11,7 @@ import com.example.demo.core.security.JwtUtils
 import com.example.demo.core.util.CryptoUtils
 import com.example.demo.core.util.PasswordGenerator
 import com.example.demo.core.util.TransliterationUtils
+import com.example.demo.features.auth.dto.AdminUserDto
 import com.example.demo.features.auth.dto.Auth
 import com.example.demo.features.auth.dto.AuthReturns
 import com.example.demo.features.auth.dto.CreateUserRequest
@@ -243,6 +244,41 @@ class UserServiceQ(
                 createUserAuto(req)
             }
         }
+    }
+
+    @Transactional
+    fun updateUserRoles(userId: UUID, newRoles: Set<Role>): AdminUserDto {
+        if (newRoles.isEmpty()) {
+            throw RuntimeException("Пользователь должен иметь хотя бы одну роль")
+        }
+
+        val user = userRepository.findByIdOrNull(userId)
+            ?: throw RuntimeException("Пользователь не найден")
+
+        user.roles = newRoles.toMutableSet()
+        val saved = userRepository.save(user)
+
+        return AdminUserDto(
+            userId = saved.id!!,
+            login = saved.login,
+            roles = saved.roles,
+            name = saved.name,
+            surname = saved.surname,
+            fatherName = saved.fatherName,
+            groupId = saved.group?.id
+        )
+    }
+
+    @Transactional
+    fun deleteUser(userId: UUID, currentLogin: String) {
+        val user = userRepository.findByIdOrNull(userId)
+            ?: throw RuntimeException("Пользователь не найден")
+
+        if (user.login == currentLogin) {
+            throw RuntimeException("Нельзя удалить самого себя")
+        }
+
+        userRepository.delete(user)
     }
 
 }

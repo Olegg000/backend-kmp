@@ -30,3 +30,17 @@ data class RegUser (
     val surname: String,
     val fatherName: String,
 )
+
+data class UpdateUserRolesRequest(
+    val roles: Set<Role>
+)
+
+data class AdminUserDto(
+    val userId: UUID,
+    val login: String,
+    val roles: Set<Role>,
+    val name: String,
+    val surname: String,
+    val fatherName: String,
+    val groupId: Int?
+)

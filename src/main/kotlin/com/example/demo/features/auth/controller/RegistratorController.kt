@@ -1,13 +1,17 @@
 package com.example.demo.features.auth.controller
 
+import com.example.demo.features.auth.dto.AdminUserDto
 import com.example.demo.features.auth.dto.CreateUserRequest
 import com.example.demo.features.auth.dto.RegistrationDto
+import com.example.demo.features.auth.dto.UpdateUserRolesRequest
 import com.example.demo.features.auth.dto.UserCredentialsResponse
 import com.example.demo.features.auth.service.UserServiceQ
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -53,6 +57,27 @@ class RegistratorController(
     fun uploadStudents(@RequestParam("file") file: MultipartFile) {
         val content = String(file.bytes, StandardCharsets.UTF_8) // Или windows-1251 для русской винды
         userService.importStudentsFromCsv(content)
+    }
+
+    @PatchMapping("/users/{userId}/roles")
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
+    @Operation(summary = "Обновить роли пользователя")
+    fun updateUserRoles(
+        principal: Principal,
+        @PathVariable userId: UUID,
+        @RequestBody request: UpdateUserRolesRequest
+    ): AdminUserDto {
+        return userService.updateUserRoles(userId, request.roles)
+    }
+
+    @DeleteMapping("/users/{userId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
+    @Operation(summary = "Удалить пользователя")
+    fun deleteUser(
+        principal: Principal,
+        @PathVariable userId: UUID
+    ) {
+        userService.deleteUser(userId, principal.name)
     }
 
 }
