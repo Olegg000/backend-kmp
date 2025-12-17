@@ -152,4 +152,42 @@ class RegistratorUsersControllerTest(
         )
             .andExpect(status().isForbidden)
     }
+
+    @Test
+    @DisplayName("GET /api/v1/registrator/users с фильтром по роли возвращает только нужных")
+    fun `get users by role`() {
+        val token = createAdminToken()
+
+        val student = userRepository.save(
+            UserEntity(
+                login = "stud-list",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Студент",
+                surname = "Список",
+                fatherName = "Тестович"
+            )
+        )
+
+        val chef = userRepository.save(
+            UserEntity(
+                login = "chef-list",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CHEF),
+                name = "Повар",
+                surname = "Список",
+                fatherName = "Кулинарович"
+            )
+        )
+
+        mockMvc.perform(
+            get("/api/v1/registrator/users")
+                .header("Authorization", "Bearer $token")
+                .param("role", "STUDENT")
+                .accept(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].login").value(student.login))
+    }
 }

@@ -1,5 +1,6 @@
 package com.example.demo.features.auth.controller
 
+import com.example.demo.core.database.Role
 import com.example.demo.features.auth.dto.AdminUserDto
 import com.example.demo.features.auth.dto.CreateUserRequest
 import com.example.demo.features.auth.dto.RegistrationDto
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -78,6 +80,17 @@ class RegistratorController(
         @PathVariable userId: UUID
     ) {
         userService.deleteUser(userId, principal.name)
+    }
+
+    @GetMapping("/users")
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
+    @Operation(summary = "Получить список пользователей")
+    fun listUsers(
+        @RequestParam(required = false) role: Role?,
+        @RequestParam(required = false) groupId: Int?,
+        @RequestParam(required = false) search: String?
+    ): List<AdminUserDto> {
+        return userService.listUsers(role, groupId, search)
     }
 
 }

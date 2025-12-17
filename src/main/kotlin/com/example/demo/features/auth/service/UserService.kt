@@ -281,4 +281,38 @@ class UserServiceQ(
         userRepository.delete(user)
     }
 
+    fun listUsers(role: Role?, groupId: Int?, search: String?): List<AdminUserDto> {
+        var users = userRepository.findAll()
+
+        if (role != null) {
+            users = users.filter { it.roles.contains(role) }
+        }
+
+        if (groupId != null) {
+            users = users.filter { it.group?.id == groupId }
+        }
+
+        if (!search.isNullOrBlank()) {
+            val q = search.trim().lowercase()
+            users = users.filter {
+                it.login.lowercase().contains(q) ||
+                        it.name.lowercase().contains(q) ||
+                        it.surname.lowercase().contains(q) ||
+                        it.fatherName.lowercase().contains(q)
+            }
+        }
+
+        return users.map {
+            AdminUserDto(
+                userId = it.id!!,
+                login = it.login,
+                roles = it.roles.toSet(),
+                name = it.name,
+                surname = it.surname,
+                fatherName = it.fatherName,
+                groupId = it.group?.id
+            )
+        }
+    }
+
 }
