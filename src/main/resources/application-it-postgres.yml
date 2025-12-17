@@ -17,6 +17,8 @@ spring:
   sql:
     init:
       mode: never
+server:
+  forward-headers-strategy: framework
 
 jwt:
   secret: TestSecretKeyForPostgresIT_ChangeMe
