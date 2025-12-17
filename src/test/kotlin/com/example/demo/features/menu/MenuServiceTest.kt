@@ -1,5 +1,6 @@
 package com.example.demo.features.menu
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.entity.MenuEntity
 import com.example.demo.core.database.repository.MenuRepository
 import com.example.demo.features.menu.dto.CreateMenuItemRequest
@@ -15,7 +16,7 @@ import java.time.LocalDate
 
 @DataJpaTest
 @Import(MenuService::class)
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("MenuService - управление меню")
 class MenuServiceTest(
 

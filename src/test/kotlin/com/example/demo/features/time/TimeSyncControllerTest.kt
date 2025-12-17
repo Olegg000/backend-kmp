@@ -1,5 +1,6 @@
 package com.example.demo.features.time
 
+import com.example.demo.config.TestProfileResolver
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,7 +14,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("TimeSyncController - текущее время сервера")
 class TimeSyncControllerTest(
 

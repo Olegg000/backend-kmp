@@ -1,4 +1,4 @@
-package com.example.demo.features.qr.service
+package com.example.demo.features.qr
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
@@ -13,6 +13,8 @@ import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.util.CryptoUtils
 import com.example.demo.features.qr.dto.ValidateQRRequest
+import com.example.demo.features.qr.service.QRCodeService
+import com.example.demo.features.qr.service.QRValidationService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName

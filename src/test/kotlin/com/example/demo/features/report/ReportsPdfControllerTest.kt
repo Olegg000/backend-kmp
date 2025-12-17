@@ -14,11 +14,13 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles(resolver = TestProfileResolver::class)
+@Transactional
 class ReportsPdfControllerTest(
 
     @Autowired private val mockMvc: MockMvc,
@@ -30,7 +32,7 @@ class ReportsPdfControllerTest(
     fun `export pdf returns application pdf`() {
         val admin = userRepository.save(
             UserEntity(
-                login = "admin-pdf",
+                login = "admin-pdf-${java.util.UUID.randomUUID()}",
                 passwordHash = "h",
                 roles = mutableSetOf(Role.ADMIN),
                 name = "Admin",
@@ -50,8 +52,8 @@ class ReportsPdfControllerTest(
         )
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_PDF))
-            .andExpect { result ->
-                val bytes = result.response.contentAsByteArray
+            .andExpect {
+                val bytes = it.response.contentAsByteArray
                 assert(bytes.isNotEmpty()) { "PDF не должен быть пустым" }
             }
     }

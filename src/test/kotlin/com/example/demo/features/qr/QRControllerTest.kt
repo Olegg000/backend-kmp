@@ -1,4 +1,4 @@
-package com.example.demo.features.qr.controller
+package com.example.demo.features.qr
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType

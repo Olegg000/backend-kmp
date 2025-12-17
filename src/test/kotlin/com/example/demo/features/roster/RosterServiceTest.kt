@@ -1,4 +1,4 @@
-package com.example.demo.features.roster.service
+package com.example.demo.features.roster
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
@@ -9,6 +9,7 @@ import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.roster.dto.DayPermissionDto
 import com.example.demo.features.roster.dto.UpdateRosterRequest
+import com.example.demo.features.roster.service.RosterService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 @DataJpaTest
@@ -93,7 +95,7 @@ class RosterServiceTest {
     @DisplayName("Куратор видит всех студентов своей группы")
     fun `getRosterForGroup should return all students in curator group`() {
         // Given
-        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
 
         // When
         val roster = rosterService.getRosterForGroup(curator.login, monday)
@@ -113,7 +115,7 @@ class RosterServiceTest {
     @DisplayName("Изначально все разрешения должны быть false")
     fun `initial roster should have all permissions set to false`() {
         // Given
-        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
 
         // When
         val roster = rosterService.getRosterForGroup(curator.login, monday)
@@ -134,7 +136,7 @@ class RosterServiceTest {
     @DisplayName("Обновление разрешений студента работает корректно")
     fun `updateRoster should save permissions correctly`() {
         // Given
-        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
         val permissions = listOf(
             DayPermissionDto(monday, true, true, false, false, false, "Учебный день"),
             DayPermissionDto(monday.plusDays(1), true, true, true, false, false, "Полный день")
@@ -169,7 +171,7 @@ class RosterServiceTest {
     @DisplayName("Обновление разрешений не затрагивает других студентов")
     fun `updateRoster should not affect other students`() {
         // Given
-        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
         val permissions = listOf(
             DayPermissionDto(monday, true, true, true, false, false, "Тест")
         )
@@ -195,7 +197,7 @@ class RosterServiceTest {
     @DisplayName("Снятие всех галочек удаляет запись из БД")
     fun `updateRoster with all false should delete permission`() {
         // Given - сначала создаем разрешение
-        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
         val createRequest = UpdateRosterRequest(
             student1.id!!,
             listOf(DayPermissionDto(monday, true, true, false, false, false))

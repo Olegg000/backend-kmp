@@ -1,4 +1,4 @@
-package com.example.demo.features.transactions.service
+package com.example.demo.features.transactions
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
@@ -12,6 +12,7 @@ import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.SuspiciousTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.transactions.dto.TransactionSyncItem
+import com.example.demo.features.transactions.service.TransactionsService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName

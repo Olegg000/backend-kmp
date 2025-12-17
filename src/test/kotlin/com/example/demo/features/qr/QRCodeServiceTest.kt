@@ -1,11 +1,13 @@
-package com.example.demo.features.qr.service
+package com.example.demo.features.qr
 
 import com.example.demo.core.database.MealType
 import com.example.demo.core.util.CryptoUtils
+import com.example.demo.features.qr.service.QRCodeService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
+import java.util.Base64
 import java.util.UUID
 
 @DisplayName("QRCodeService - Криптография QR-кодов")
@@ -41,7 +43,7 @@ class QRCodeServiceTest {
         assertNotNull(signature)
         assertTrue(signature.isNotEmpty())
         // Проверяем, что это валидный Base64
-        assertDoesNotThrow { java.util.Base64.getDecoder().decode(signature) }
+        assertDoesNotThrow { Base64.getDecoder().decode(signature) }
     }
 
     @Test

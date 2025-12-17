@@ -11,10 +11,13 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDateTime
+
 
 @SpringBootTest
 @ActiveProfiles(resolver = TestProfileResolver::class)
+@Transactional
 class MealTransactionSmokeTest(
     @Autowired private val userRepository: UserRepository,
     @Autowired private val transactionRepository: MealTransactionRepository
@@ -24,7 +27,7 @@ class MealTransactionSmokeTest(
     fun `save transaction should work`() {
         val user = userRepository.save(
             UserEntity(
-                login = "u1",
+                login = "u1-${java.util.UUID.randomUUID()}",
                 passwordHash = "h",
                 roles = mutableSetOf(Role.STUDENT),
                 name = "Имя",
@@ -35,7 +38,7 @@ class MealTransactionSmokeTest(
 
         val chef = userRepository.save(
             UserEntity(
-                login = "c1",
+                login = "c1-${java.util.UUID.randomUUID()}",
                 passwordHash = "h",
                 roles = mutableSetOf(Role.CHEF),
                 name = "Имя",
@@ -46,7 +49,7 @@ class MealTransactionSmokeTest(
 
         transactionRepository.save(
             MealTransactionEntity(
-                transactionHash = "h1",
+                transactionHash = "h1-${java.util.UUID.randomUUID()}",
                 timeStamp = LocalDateTime.now(),
                 student = user,
                 chef = chef,

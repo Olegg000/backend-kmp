@@ -1,8 +1,10 @@
-package com.example.demo.core.util
+package com.example.demo.features.crypto
 
+import com.example.demo.core.util.CryptoUtils
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.util.Base64
 
 @DisplayName("CryptoUtils - Утилиты криптографии")
 class CryptoUtilsTest {
@@ -20,8 +22,8 @@ class CryptoUtilsTest {
         assertTrue(privateKey.isNotEmpty())
 
         // Проверяем, что это валидный Base64
-        assertDoesNotThrow { java.util.Base64.getDecoder().decode(publicKey) }
-        assertDoesNotThrow { java.util.Base64.getDecoder().decode(privateKey) }
+        assertDoesNotThrow { Base64.getDecoder().decode(publicKey) }
+        assertDoesNotThrow { Base64.getDecoder().decode(privateKey) }
     }
 
     @Test
@@ -80,7 +82,7 @@ class CryptoUtilsTest {
         assertNotEquals(nonce1, nonce2, "Каждый nonce должен быть уникальным")
 
         // Проверяем Base64
-        assertDoesNotThrow { java.util.Base64.getDecoder().decode(nonce1) }
+        assertDoesNotThrow { Base64.getDecoder().decode(nonce1) }
     }
 
     @Test
@@ -122,6 +124,6 @@ class CryptoUtilsTest {
         val hash = CryptoUtils.sha256(input)
 
         // Then
-        assertDoesNotThrow { java.util.Base64.getDecoder().decode(hash) }
+        assertDoesNotThrow { Base64.getDecoder().decode(hash) }
     }
 }

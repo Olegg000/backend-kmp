@@ -1,5 +1,6 @@
 package com.example.demo.features.menu
 
+import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.UserRepository
@@ -22,7 +23,7 @@ import java.time.LocalDate
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@ActiveProfiles(resolver = TestProfileResolver::class)
 @Transactional
 @DisplayName("MenuController - REST API")
 class MenuControllerTest(
@@ -63,8 +64,11 @@ class MenuControllerTest(
 
     @Test
     fun `GET menu returns 200`() {
+        val token = studentToken() // или chefToken(), не важно, GET не ограничен по роли
+
         mockMvc.perform(
             get("/api/v1/menu")
+                .header("Authorization", "Bearer $token")
                 .accept(MediaType.APPLICATION_JSON)
         )
             .andExpect(status().isOk)
@@ -106,5 +110,21 @@ class MenuControllerTest(
                 .content(objectMapper.writeValueAsString(req))
         )
             .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `POST menu without token returns 4xx`() {
+        val req = CreateMenuItemRequest(
+            date = LocalDate.now(),
+            name = "Компот",
+            description = "Фруктовый"
+        )
+
+        mockMvc.perform(
+            post("/api/v1/menu")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req))
+        )
+            .andExpect(status().is4xxClientError)
     }
 }

@@ -1,4 +1,4 @@
-package com.example.demo.features.reports.service
+package com.example.demo.features.report
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
@@ -7,6 +7,7 @@ import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.features.reports.service.ReportsService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -15,9 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 
 @DataJpaTest
 @Import(ReportsService::class)
@@ -194,7 +195,7 @@ class ReportsServiceTest {
     @DisplayName("Недельный отчет возвращает 7 дней")
     fun `weekly report should return 7 days`() {
         // Given
-        val monday = LocalDate.now().with(java.time.DayOfWeek.MONDAY)
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
 
         // When
         val report = reportsService.generateWeeklyReport(monday)

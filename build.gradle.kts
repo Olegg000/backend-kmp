@@ -74,5 +74,11 @@ allOpen {
 }
 
 tasks.withType<Test> {
-	useJUnitPlatform()
+    useJUnitPlatform()
+
+    // Пробрасываем системное свойство dbProfile в тестовый JVM
+    val dbProfile = System.getProperty("dbProfile")
+    if (dbProfile != null) {
+        systemProperty("dbProfile", dbProfile)
+    }
 }
