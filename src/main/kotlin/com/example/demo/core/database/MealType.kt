@@ -5,6 +5,5 @@ enum class MealType {
     LUNCH,      // Обед
     DINNER,     // Ужин
     SNACK,      // Полдник ( то что ты хотел)
-    SUPPER,     // Поздний ужин / Второй ужин
     SPECIAL     // Спец. питание (сухпаек и т.д.)
 }
