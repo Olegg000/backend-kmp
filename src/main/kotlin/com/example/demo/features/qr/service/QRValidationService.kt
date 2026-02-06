@@ -3,14 +3,19 @@ package com.example.demo.features.qr.service
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.features.qr.dto.QRValidationError
 import com.example.demo.features.qr.dto.ValidateQRRequest
 import com.example.demo.features.qr.dto.ValidateQRResponse
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import kotlin.jvm.optionals.getOrNull
 
 @Service
@@ -26,6 +31,7 @@ class QRValidationService(
      * Онлайн-валидация (с проверкой БД)
      * Полная проверка всех условий перед выдачей еды
      */
+    @Transactional
     fun validateOnline(req: ValidateQRRequest): ValidateQRResponse {
         logger.info("Online validation started for user: ${req.userId}")
 
@@ -85,6 +91,29 @@ class QRValidationService(
                 "${student.surname} ${student.name}"
             )
         }
+
+        val chefLogin = SecurityContextHolder.getContext().authentication?.name
+        val chef = chefLogin?.let { userRepository.findByLogin(it) }
+            ?: return createErrorResponse(
+                QRValidationError.INVALID_SIGNATURE,
+                "${student.surname} ${student.name}",
+                "Повар не найден"
+            )
+
+        val timestamp = LocalDateTime.ofInstant(
+            Instant.ofEpochSecond(req.timestamp),
+            ZoneId.systemDefault()
+        )
+        transactionRepository.save(
+            MealTransactionEntity(
+                transactionHash = txHash,
+                timeStamp = timestamp,
+                student = student,
+                chef = chef,
+                isOffline = false,
+                mealType = req.mealType
+            )
+        )
 
         logger.info("Validation successful for ${student.login}")
         return ValidateQRResponse(
