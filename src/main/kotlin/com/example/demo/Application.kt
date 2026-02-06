@@ -11,5 +11,6 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 class Application
 
 fun main(args: Array<String>) {
+    println("VERSION-FOOD-1.0.0")
     runApplication<Application>(*args)
 }
