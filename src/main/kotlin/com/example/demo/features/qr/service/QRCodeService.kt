@@ -56,8 +56,7 @@ class QRCodeService {
 
             signature.verify(signatureBytes)
         } catch (e: Exception) {
-            // Логируем ошибку (в prod нужен proper logging)
-            println("Signature verification failed: ${e.message}")
+            org.slf4j.LoggerFactory.getLogger(QRCodeService::class.java).error("Signature verification failed", e)
             false
         }
     }

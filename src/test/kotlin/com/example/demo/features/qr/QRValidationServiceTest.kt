@@ -13,6 +13,7 @@ import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.util.CryptoUtils
 import com.example.demo.features.qr.dto.ValidateQRRequest
+import com.example.demo.features.qr.dto.OfflineTransactionDto // Import DTO
 import com.example.demo.features.qr.service.QRCodeService
 import com.example.demo.features.qr.service.QRValidationService
 import org.junit.jupiter.api.Assertions.*
@@ -106,6 +107,24 @@ class QRValidationIntegrationTest {
                 isSpecialAllowed = false
             )
         )
+        
+        // Создаем повара для проверки QR (онлайн)
+        val testChef = userRepository.save(
+            UserEntity(
+                login = "chef-default",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CHEF),
+                name = "Повар",
+                surname = "Дефолтный",
+                fatherName = "X"
+            )
+        )
+        
+        // Устанавливаем контекст безопасности (логинимся как повар)
+        org.springframework.security.core.context.SecurityContextHolder.getContext().authentication =
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "chef-default", "password", listOf(org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CHEF"))
+            )
     }
 
     @Test
@@ -270,8 +289,8 @@ class QRValidationIntegrationTest {
     }
 
     @Test
-    @DisplayName("Оффлайн валидация работает без БД")
-    fun `offline validation should work without database checks`() {
+    @DisplayName("Синхронизация оффлайн транзакций")
+    fun `sync offline transactions`() {
         // Given
         val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
         val nonce = CryptoUtils.generateNonce()
@@ -280,15 +299,55 @@ class QRValidationIntegrationTest {
             student.id.toString(), timestamp, MealType.LUNCH, nonce, privateKey
         )
 
-        val request = ValidateQRRequest(
-            student.id!!, timestamp, MealType.LUNCH, nonce, signature
+        val transaction = OfflineTransactionDto(
+            userId = student.id.toString(),
+            timestamp = timestamp,
+            mealType = MealType.LUNCH,
+            nonce = nonce,
+            signature = signature
         )
 
-        // When - оффлайн валидация (не проверяет табель и double spending)
-        val response = qrValidationService.validateOffline(request)
+        // Mock security context for Chef (so we can sync)
+        // In @DataJpaTest with @Import(QRValidationService), SecurityContext might be empty or mocked differently.
+        // We'll trust the logic or setup a mock if needed.
+        // But wait, `SecurityContextHolder.getContext().authentication?.name` is used in service.
+        // We need to set it up.
+        org.springframework.security.core.context.SecurityContextHolder.getContext().authentication =
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "curator", "password", listOf(org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CHEF"))
+            )
+        // Note: in setup() we created "curator" login, but assigned ROLE_CURATOR. 
+        // Sync needs CHEF or ADMIN. The service check is: validation logic expects 'chef' login.
+        // Let's create a CHEF user in test setup or here.
+        
+        val chef = userRepository.save(
+            UserEntity(
+                login = "real_chef", 
+                passwordHash = "hash", 
+                roles = mutableSetOf(Role.CHEF), 
+                name = "Chef", 
+                surname = "Cook", 
+                fatherName = "X"
+            )
+        )
+        
+        org.springframework.security.core.context.SecurityContextHolder.getContext().authentication =
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "real_chef", "password", listOf(org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CHEF"))
+            )
+
+
+        // When
+        val response = qrValidationService.syncOfflineTransactions(listOf(transaction))
 
         // Then
-        assertTrue(response.isValid, "Оффлайн валидация должна пройти (только крипто + время)")
+        assertEquals(1, response.successCount)
+        assertEquals(0, response.failedCount)
+        assertTrue(response.errors.isEmpty())
+        
+        // Verify it's in DB
+        val txHash = qrCodeService.generateTransactionHash(student.id.toString(), timestamp, MealType.LUNCH, nonce)
+        assertTrue(transactionRepository.existsByTransactionHash(txHash))
     }
 
     @Test

@@ -2,6 +2,8 @@ package com.example.demo.features.qr.controller
 
 import com.example.demo.features.qr.dto.ValidateQRRequest
 import com.example.demo.features.qr.dto.ValidateQRResponse
+import com.example.demo.features.qr.dto.OfflineTransactionDto
+import com.example.demo.features.qr.dto.SyncResponse
 import com.example.demo.features.qr.service.QRValidationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -24,10 +26,10 @@ class QRController(
         return qrValidationService.validateOnline(req)
     }
 
-    @PostMapping("/validate-offline")
-    @Operation(summary = "Проверить QR-код (оффлайн, без авторизации)")
-    fun validateOffline(@RequestBody req: ValidateQRRequest): ValidateQRResponse {
-        // Этот endpoint НЕ требует JWT, чтобы повар мог работать без интернета
-        return qrValidationService.validateOffline(req)
+    @PostMapping("/sync")
+    @PreAuthorize("hasAnyRole('CHEF', 'ADMIN')")
+    @Operation(summary = "Синхронизация оффлайн транзакций")
+    fun syncTransactions(@RequestBody transactions: List<OfflineTransactionDto>): SyncResponse {
+        return qrValidationService.syncOfflineTransactions(transactions)
     }
 }

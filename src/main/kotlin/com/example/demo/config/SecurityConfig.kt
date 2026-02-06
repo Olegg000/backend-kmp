@@ -43,7 +43,6 @@ class SecurityConfig(
                     "/swagger-ui.html"
                 ).permitAll()
                 auth.requestMatchers("/api/v1/auth/**", "/api/auth/**").permitAll()
-                auth.requestMatchers("/api/v1/qr/validate-offline").permitAll() // Оффлайн-проверка QR
                 auth.requestMatchers("/api/v1/time/current").permitAll() // Синхронизация времени
 
                 // Твои контроллеры

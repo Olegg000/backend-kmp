@@ -7,6 +7,9 @@ import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.features.qr.dto.QRValidationError
 import com.example.demo.features.qr.dto.ValidateQRRequest
 import com.example.demo.features.qr.dto.ValidateQRResponse
+import com.example.demo.features.qr.dto.OfflineTransactionDto
+import com.example.demo.features.qr.dto.SyncResponse
+import com.example.demo.features.qr.dto.SyncError
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.security.core.context.SecurityContextHolder
@@ -123,22 +126,92 @@ class QRValidationService(
         )
     }
 
+
     /**
-     * Оффлайн-валидация (без БД, только криптография + время)
-     * Используется поваром, когда нет интернета
-     *
-     * ВАЖНО: Это не даёт 100% защиту от double spending между разными поварами,
-     * но защищает от подделки QR и повторного использования у одного повара
+     * Синхронизация оффлайн-транзакций
+     * Принимает список транзакций, накопленных поваром, и сохраняет их в БД
      */
-    fun validateOffline(req: ValidateQRRequest): ValidateQRResponse {
-        logger.info("Offline validation started for user: ${req.userId}")
-        return performBasicValidation(req)
+    @Transactional
+    fun syncOfflineTransactions(transactions: List<OfflineTransactionDto>): SyncResponse {
+        logger.info("Syncing ${transactions.size} offline transactions")
+        
+        val chefLogin = SecurityContextHolder.getContext().authentication?.name
+        val chef = chefLogin?.let { userRepository.findByLogin(it) }
+            ?: throw IllegalStateException("Chef not found")
+
+        var successCount = 0
+        var failedCount = 0
+        val errors = mutableListOf<SyncError>()
+
+        transactions.forEach { tx ->
+            try {
+                // 1. Поиск студента
+                val student = userRepository.findById(java.util.UUID.fromString(tx.userId)).getOrNull()
+                if (student == null) {
+                    failedCount++
+                    errors.add(SyncError(tx.userId, "Student not found"))
+                    return@forEach
+                }
+
+                // 2. Проверка подписи (игнорируем время, так как это пост-фактум синхронизация)
+                val isSignatureValid = qrCodeService.verifySignature(
+                    tx.userId,
+                    tx.timestamp,
+                    tx.mealType,
+                    tx.nonce,
+                    tx.signature,
+                    student.publicKey ?: ""
+                )
+
+                if (!isSignatureValid) {
+                    failedCount++
+                    errors.add(SyncError(tx.userId, "Invalid signature"))
+                    return@forEach
+                }
+
+                // 3. Проверка на дубликаты (хэш транзакции)
+                val txHash = qrCodeService.generateTransactionHash(
+                    tx.userId, tx.timestamp, tx.mealType, tx.nonce
+                )
+                
+                if (transactionRepository.existsByTransactionHash(txHash)) {
+                     // Уже синхронизировано - считаем как успех (идемпотентность), но не сохраняем дубль
+                     successCount++
+                     return@forEach
+                }
+                
+                // 4. Сохранение
+                 val timestamp = LocalDateTime.ofInstant(
+                    Instant.ofEpochSecond(tx.timestamp),
+                    ZoneId.systemDefault()
+                )
+                
+                transactionRepository.save(
+                    MealTransactionEntity(
+                        transactionHash = txHash,
+                        timeStamp = timestamp,
+                        student = student,
+                        chef = chef,
+                        isOffline = true,
+                        mealType = tx.mealType
+                    )
+                )
+                successCount++
+
+            } catch (e: Exception) {
+                logger.error("Error syncing transaction for user ${tx.userId}", e)
+                failedCount++
+                errors.add(SyncError(tx.userId, "Internal error: ${e.message}"))
+            }
+        }
+
+        return SyncResponse(successCount, failedCount, errors)
     }
 
     /**
      * Базовая проверка (работает без интернета)
      * 1. Проверка подписи (ECDSA)
-     * 2. Проверка времени (±60 секунд)
+     * 2. Проверка времени (±60 секунд) - ТОЛЬКО ДЛЯ ОНЛАЙН ВАЛИДАЦИИ
      */
     private fun performBasicValidation(req: ValidateQRRequest): ValidateQRResponse {
         // 1. Проверка времени (±60 секунд от текущего момента)

@@ -12,13 +12,14 @@ import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.util.CryptoUtils
 import com.example.demo.features.qr.dto.ValidateQRRequest
+import com.example.demo.features.qr.dto.OfflineTransactionDto // NEW
 import com.example.demo.features.qr.service.QRCodeService
 import com.example.demo.features.qr.service.QRValidationService
 import com.example.demo.features.roster.dto.DayPermissionDto
 import com.example.demo.features.roster.dto.UpdateRosterRequest
 import com.example.demo.features.roster.service.RosterService
-import com.example.demo.features.transactions.dto.TransactionSyncItem
-import com.example.demo.features.transactions.service.TransactionsService
+// import com.example.demo.features.transactions.dto.TransactionSyncItem // REMOVED
+// import com.example.demo.features.transactions.service.TransactionsService // REMOVED
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -70,8 +71,7 @@ class FullFlowTest {
     @Autowired
     private lateinit var qrValidationService: QRValidationService
 
-    @Autowired
-    private lateinit var transactionsService: TransactionsService
+
 
     private lateinit var student: UserEntity
     private lateinit var curator: UserEntity
@@ -175,36 +175,35 @@ class FullFlowTest {
 
         // === ШАГ 3: Повар сканирует QR (OFFLINE) ===
         println("\n=== ШАГ 3: Повар проверяет QR (оффлайн) ===")
-        val qrRequest = ValidateQRRequest(
-            userId = student.id!!,
+        // Эмуляция проверки на устройстве повара
+        val isSignatureValid = qrCodeService.verifySignature(
+            student.id.toString(), timestamp, mealType, nonce, signature, publicKey
+        )
+        assertTrue(isSignatureValid, "QR подпись должна быть валидна")
+
+        // Проверка времени на клиенте (примерно)
+        assertTrue(qrCodeService.isTimestampValid(timestamp), "QR не должен быть просрочен")
+        
+        println("✅ Оффлайн-проверка пройдена (client-side simulation)")
+
+        // === ШАГ 4: Повар синхронизирует транзакцию ===
+        println("\n=== ШАГ 4: Синхронизация транзакций ===")
+        
+        // Mock Security Context for Chef
+         org.springframework.security.core.context.SecurityContextHolder.getContext().authentication =
+            org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                chef.login, "password", listOf(org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CHEF"))
+            )
+
+        val offlineTx = OfflineTransactionDto(
+            userId = student.id.toString(),
             timestamp = timestamp,
             mealType = mealType,
             nonce = nonce,
             signature = signature
         )
 
-        val offlineValidation = qrValidationService.validateOffline(qrRequest)
-        assertTrue(offlineValidation.isValid, "QR должен быть валиден оффлайн")
-        assertEquals("Студентов Иван", offlineValidation.studentName)
-
-        println("✅ Оффлайн-проверка пройдена: ${offlineValidation.studentName}")
-
-        // === ШАГ 4: Повар синхронизирует транзакцию ===
-        println("\n=== ШАГ 4: Синхронизация транзакций ===")
-        val txHash = qrCodeService.generateTransactionHash(
-            student.id.toString(), timestamp, mealType, nonce
-        )
-
-        val syncItems = listOf(
-            TransactionSyncItem(
-                studentId = student.id!!,
-                timestamp = LocalDateTime.now(),
-                mealType = mealType,
-                transactionHash = txHash
-            )
-        )
-
-        val syncResponse = transactionsService.syncBatch(chef.login, syncItems)
+        val syncResponse = qrValidationService.syncOfflineTransactions(listOf(offlineTx))
         assertEquals(1, syncResponse.successCount, "Транзакция должна быть успешной")
         assertTrue(syncResponse.errors.isEmpty(), "Не должно быть ошибок")
 
@@ -212,7 +211,7 @@ class FullFlowTest {
 
         // === ШАГ 5: Проверка защиты от двойного прохода ===
         println("\n=== ШАГ 5: Защита от Double Spending ===")
-        val secondAttempt = transactionsService.syncBatch(chef.login, syncItems)
+        val secondAttempt = qrValidationService.syncOfflineTransactions(listOf(offlineTx))
         assertEquals(1, secondAttempt.successCount, "Дубль должен быть проигнорирован (идемпотентность)")
 
         // Но новый QR с новым nonce должен быть отклонён (студент уже ел)
@@ -262,8 +261,10 @@ class FullFlowTest {
         )
 
         // Оффлайн-проверка пройдёт (крипто ОК)
-        val offlineCheck = qrValidationService.validateOffline(qrRequest)
-        assertTrue(offlineCheck.isValid)
+        val isSignatureValid = qrCodeService.verifySignature(
+             student.id.toString(), timestamp, MealType.LUNCH, nonce, signature, publicKey
+        )
+        assertTrue(isSignatureValid)
 
         // Но онлайн-проверка отклонит (нет в табеле)
         val onlineCheck = qrValidationService.validateOnline(qrRequest)
@@ -305,9 +306,11 @@ class FullFlowTest {
         )
 
         // Проверка должна провалиться
-        val validation = qrValidationService.validateOffline(fakeQr)
-        assertFalse(validation.isValid)
-        assertEquals("INVALID_SIG", validation.errorCode)
+        // Проверка должна провалиться
+        val isSignatureValid = qrCodeService.verifySignature(
+             student.id.toString(), timestamp, MealType.LUNCH, nonce, fakeSignature, publicKey
+        )
+        assertFalse(isSignatureValid, "Подпись должна быть невалидна")
 
         println("✅ Подделка обнаружена: INVALID_SIG")
     }
@@ -325,9 +328,8 @@ class FullFlowTest {
             student.id!!, expiredTimestamp, MealType.LUNCH, nonce, signature
         )
 
-        val validation = qrValidationService.validateOffline(expiredQr)
-        assertFalse(validation.isValid)
-        assertEquals("QR_EXPIRED", validation.errorCode)
+        val isValid = qrCodeService.isTimestampValid(expiredTimestamp)
+        assertFalse(isValid, "Timestamp должен быть просрочен")
 
         println("✅ Устаревший QR отклонён: QR_EXPIRED")
     }
