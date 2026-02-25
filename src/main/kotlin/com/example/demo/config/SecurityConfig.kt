@@ -44,6 +44,7 @@ class SecurityConfig(
                 ).permitAll()
                 auth.requestMatchers("/api/v1/auth/**", "/api/auth/**").permitAll()
                 auth.requestMatchers("/api/v1/time/current").permitAll() // Синхронизация времени
+                auth.requestMatchers("/api/v1/qr/validate-offline").permitAll() // Оффлайн валидация QR
 
                 // Твои контроллеры
                 auth.requestMatchers("/api/v1/auth/**", "/api/auth/**").permitAll()

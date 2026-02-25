@@ -209,6 +209,14 @@ class QRValidationService(
     }
 
     /**
+     * Оффлайн-валидация (только криптография + время)
+     * Работает без JWT-токена, выполняет базовую проверку
+     */
+    fun validateOffline(req: ValidateQRRequest): ValidateQRResponse {
+        return performBasicValidation(req)
+    }
+
+    /**
      * Базовая проверка (работает без интернета)
      * 1. Проверка подписи (ECDSA)
      * 2. Проверка времени (±60 секунд) - ТОЛЬКО ДЛЯ ОНЛАЙН ВАЛИДАЦИИ

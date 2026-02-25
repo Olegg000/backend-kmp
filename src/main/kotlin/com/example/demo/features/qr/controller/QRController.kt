@@ -26,6 +26,12 @@ class QRController(
         return qrValidationService.validateOnline(req)
     }
 
+    @PostMapping("/validate-offline")
+    @Operation(summary = "Проверить QR-код (оффлайн, без JWT)")
+    fun validateOffline(@RequestBody req: ValidateQRRequest): ValidateQRResponse {
+        return qrValidationService.validateOffline(req)
+    }
+
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('CHEF', 'ADMIN')")
     @Operation(summary = "Синхронизация оффлайн транзакций")
