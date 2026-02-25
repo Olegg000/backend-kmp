@@ -9,11 +9,13 @@ services:
     volumes:
       # сюда можно положить .sql файлы для инициализации схемы/данных
       - ./sql-scripts/:/docker-entrypoint-initdb.d/
+      - pg_data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: P@ssw0rd
       POSTGRES_DB: pgk_food
     healthcheck:
+      # ВОТ ЗДЕСЬ БЫЛ ПРОПУЩЕН ПРОБЕЛ ПОСЛЕ test:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
@@ -52,6 +54,8 @@ services:
 
       # (опционально) если хочешь явно указать стратегию DDL
       # SPRING_JPA_HIBERNATE_DDL_AUTO: update
-
     ports:
       - "8080:8080"
+
+volumes:
+  pg_data:
