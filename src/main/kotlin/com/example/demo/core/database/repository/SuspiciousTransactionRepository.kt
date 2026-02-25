@@ -7,4 +7,6 @@ import java.time.LocalDate
 interface SuspiciousTransactionRepository : JpaRepository<SuspiciousTransactionEntity, Int> {
 
     fun findAllByDateBetween(start: LocalDate, end: LocalDate): List<SuspiciousTransactionEntity>
+
+    fun findAllByResolved(resolved: Boolean): List<SuspiciousTransactionEntity>
 }

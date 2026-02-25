@@ -12,6 +12,8 @@ interface MealPermissionRepository : JpaRepository<MealPermissionEntity, Int> {
 
     fun findByStudentAndDate(student: UserEntity, date: LocalDate): MealPermissionEntity?
 
+    fun findAllByDate(date: LocalDate): List<MealPermissionEntity>
+
     fun findAllByStudentAndDateIn(student: UserEntity, dates: List<LocalDate>): List<MealPermissionEntity>
 
     // Найти все разрешения для студентов группы за период
