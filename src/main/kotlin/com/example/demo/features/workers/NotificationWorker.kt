@@ -18,7 +18,7 @@ class NotificationWorker(
     @Scheduled(cron = "0 0 10 * * ?")
     fun checkRostersAndNotify() {
         log.info("Running NotificationWorker to check curators rosters...")
-        val curators = userRepository.findAll().filter { it.role == Role.CURATOR }
+        val curators = userRepository.findAllByRole(Role.CURATOR)
         for (curator in curators) {
             try {
                 val status = notificationService.checkCuratorRosterStatus(curator.login)
