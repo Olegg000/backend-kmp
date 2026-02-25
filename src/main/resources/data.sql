@@ -1,3 +1,3 @@
-CREATE DATABASE pgk_food;
-INSERT INTO users (id, login, password_hash, role, name, surname)
-VALUES ("uuid-1","oleg","$2a$12$IWrMXckMwhBeZgfGg.ywMul3pz9eHKYzyEYjfO2qjrh6yrYll53Vy","ADMIN", "Олег", "Владиславович")
+-- This file is intentionally empty.
+-- Database initialization is handled by sql-scripts/00-schema.sql and sql-scripts/01-init.sql
+-- which are mounted into the PostgreSQL docker-entrypoint-initdb.d directory.
