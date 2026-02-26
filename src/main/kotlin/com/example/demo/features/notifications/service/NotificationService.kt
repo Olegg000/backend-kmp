@@ -22,10 +22,10 @@ class NotificationService(
 
     fun checkCuratorRosterStatus(curatorLogin: String): Map<String, Any> {
         val curator = userRepository.findByLogin(curatorLogin)
-            ?: throw RuntimeException("Curator not found")
+            ?: throw RuntimeException("Куратор не найден")
 
         val group = curator.group
-            ?: return mapOf("needsReminder" to false, "reason" to "Curator is not assigned to group")
+            ?: return mapOf("needsReminder" to false, "reason" to "Куратор не привязан к группе")
 
         val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
         val students = userRepository.findAllByGroup(group)
@@ -109,4 +109,3 @@ class NotificationService(
         notificationRepository.save(notification)
     }
 }
-
