@@ -101,6 +101,25 @@ class UserServiceQ(
         )
     }
 
+    @Transactional
+    fun getMyKeys(login: String): com.example.demo.features.auth.dto.AuthKeysDto {
+        val user = userRepository.findByLogin(login)
+            ?: throw RuntimeException("User not found")
+            
+        // Если ключей почему-то нет (хотя создаются при первом входе), можно генерировать
+        if (user.publicKey == null || user.encryptedPrivateKey == null) {
+            val keys = CryptoUtils.generateKeyPair()
+            user.publicKey = keys.first
+            user.encryptedPrivateKey = keys.second
+            userRepository.save(user)
+        }
+        
+        return com.example.demo.features.auth.dto.AuthKeysDto(
+            publicKey = user.publicKey!!,
+            privateKey = user.encryptedPrivateKey!!
+        )
+    }
+
 
     fun registerUser(dto: RegistrationDto) {
         // 1. Валидация: занят ли логин?

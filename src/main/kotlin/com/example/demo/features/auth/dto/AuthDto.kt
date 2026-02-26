@@ -44,3 +44,8 @@ data class AdminUserDto(
     val fatherName: String,
     val groupId: Int?
 )
+
+data class AuthKeysDto(
+    val publicKey: String,
+    val privateKey: String
+)

@@ -24,4 +24,12 @@ class UserController(
         return userService.auth(request)
     }
 
+    @org.springframework.web.bind.annotation.GetMapping("/my-keys")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Получить свои криптографические ключи")
+    fun getMyKeys(): com.example.demo.features.auth.dto.AuthKeysDto {
+        val login = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication?.name
+            ?: throw RuntimeException("Not authenticated")
+        return userService.getMyKeys(login)
+    }
+
 }
