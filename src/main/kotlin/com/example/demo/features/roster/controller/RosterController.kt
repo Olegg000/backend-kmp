@@ -26,19 +26,20 @@ class RosterController(
     @PreAuthorize("hasRole('CURATOR')")
     @Operation(summary = "Получить табель своей группы на неделю")
     fun getMyRoster(
-        @RequestParam date: LocalDate, // Передаем понедельник нужной недели
-        principal: Principal // Spring сам положит сюда логин текущего пользователя
+        @RequestParam date: LocalDate,
+        @RequestParam(required = false) groupId: Int?,
+        principal: Principal
     ): List<StudentRosterRow> {
-        return rosterService.getRosterForGroup(principal.name, date)
+        return rosterService.getRosterForGroup(principal.name, date, groupId)
     }
 
     @PostMapping
     @PreAuthorize("hasRole('CURATOR')")
     @Operation(summary = "Сохранить изменения по одному студенту")
-    fun updateStudentRoster(@RequestBody req: UpdateRosterRequest,
-                            principal: Principal) {
+    fun updateStudentRoster(
+        @RequestBody req: UpdateRosterRequest,
+        principal: Principal
+    ) {
         rosterService.updateRoster(req, principal.name)
     }
-
-    // Можно добавить метод Batch update, который принимает List<UpdateRosterRequest>
 }

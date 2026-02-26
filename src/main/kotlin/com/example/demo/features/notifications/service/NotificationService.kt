@@ -2,6 +2,7 @@ package com.example.demo.features.notifications.service
 
 import com.example.demo.core.database.entity.NotificationEntity
 import com.example.demo.core.database.entity.UserEntity
+import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.NotificationRepository
 import com.example.demo.core.database.repository.UserRepository
@@ -15,6 +16,7 @@ import java.time.temporal.TemporalAdjusters
 
 @Service
 class NotificationService(
+    private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,
     private val permissionRepository: MealPermissionRepository,
     private val notificationRepository: NotificationRepository
@@ -24,15 +26,24 @@ class NotificationService(
         val curator = userRepository.findByLogin(curatorLogin)
             ?: throw RuntimeException("Куратор не найден")
 
-        val group = curator.group
-            ?: return mapOf("needsReminder" to false, "reason" to "Куратор не привязан к группе")
+        val curatorId = curator.id ?: return mapOf(
+            "needsReminder" to false,
+            "reason" to "Куратор не имеет id"
+        )
+
+        val groups = groupRepository.findAllByCurator_Id(curatorId)
+        if (groups.isEmpty()) {
+            return mapOf("needsReminder" to false, "reason" to "Куратор не привязан к группам")
+        }
 
         val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-        val students = userRepository.findAllByGroup(group)
         val datesNextWeek = (0..4).map { nextMonday.plusDays(it.toLong()) }
 
-        val hasPermissions = students.any { student ->
-            permissionRepository.findAllByStudentAndDateIn(student, datesNextWeek).isNotEmpty()
+        val hasPermissions = groups.any { group ->
+            val students = userRepository.findAllByGroup(group)
+            students.any { student ->
+                permissionRepository.findAllByStudentAndDateIn(student, datesNextWeek).isNotEmpty()
+            }
         }
 
         val deadline = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY))

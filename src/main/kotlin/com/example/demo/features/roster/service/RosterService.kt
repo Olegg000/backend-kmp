@@ -2,6 +2,7 @@ package com.example.demo.features.roster.service
 
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.MealPermissionEntity
+import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.roster.dto.DayPermissionDto
@@ -10,36 +11,43 @@ import com.example.demo.features.roster.dto.UpdateRosterRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
-import java.util.UUID
 
 @Service
 class RosterService(
+    private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,
     private val permissionRepository: MealPermissionRepository
 ) {
 
-    // Получить табель группы на указанную неделю (начиная с startDate)
-    fun getRosterForGroup(curatorLogin: String, startDate: LocalDate): List<StudentRosterRow> {
-        // 1. Ищем куратора и его студентов
+    fun getRosterForGroup(
+        curatorLogin: String,
+        startDate: LocalDate,
+        groupId: Int? = null
+    ): List<StudentRosterRow> {
         val curator = userRepository.findByLogin(curatorLogin)
             ?: throw RuntimeException("Куратор не найден")
 
-        // ВАЖНО: Куратор видит ТОЛЬКО свою группу
-        val group = curator.group
-            ?: throw RuntimeException("Куратор не привязан к группе")
+        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет id")
+        val curatorGroups = groupRepository.findAllByCurator_Id(curatorId)
+        if (curatorGroups.isEmpty()) {
+            throw RuntimeException("Куратор не привязан к группам")
+        }
 
-        // Находим студентов ТОЛЬКО из этой группы (куратор в табель не попадает)
-        val students = userRepository.findAllByGroup(group)
+        val targetGroup = if (groupId != null) {
+            curatorGroups.firstOrNull { it.id == groupId }
+                ?: throw RuntimeException("Группа недоступна куратору")
+        } else {
+            curatorGroups.minByOrNull { it.id ?: Int.MAX_VALUE }
+                ?: throw RuntimeException("Группа не найдена")
+        }
+
+        val students = userRepository.findAllByGroup(targetGroup)
             .filter { it.roles.contains(Role.STUDENT) }
 
-        // 2. Генерируем даты (например, пн-пт)
-        val dates = (0..4).map { startDate.plusDays(it.toLong()) } // 5 дней
+        val dates = (0..4).map { startDate.plusDays(it.toLong()) }
 
-        // 3. Собираем данные
         return students.map { student ->
-            // Ищем существующие разрешения в БД
             val existingPermissions = permissionRepository.findAllByStudentAndDateIn(student, dates)
-
             val daysDto = dates.map { date ->
                 val perm = existingPermissions.find { it.date == date }
                 DayPermissionDto(
@@ -60,27 +68,25 @@ class RosterService(
         }
     }
 
-    // Сохранить изменения
     @Transactional
     fun updateRoster(req: UpdateRosterRequest, assignerLogin: String) {
         val student = userRepository.findById(req.studentId)
             .orElseThrow { RuntimeException("Студент не найден") }
 
-        val assigner = userRepository.findByLogin(assignerLogin)!!
+        val assigner = userRepository.findByLogin(assignerLogin)
+            ?: throw RuntimeException("Пользователь не найден")
 
         req.permissions.forEach { dto ->
             val existing = permissionRepository.findByStudentAndDate(student, dto.date)
 
-            // Логика: Если галочки сняты - удаляем запись или ставим false?
-            // Лучше так: если все false - удаляем запись (чистим БД).
-            if (!dto.isBreakfast && !dto.isLunch && !dto.isDinner &&
-                !dto.isSnack && !dto.isSpecial) {
-                if (existing != null) permissionRepository.delete(existing)
+            if (!dto.isBreakfast && !dto.isLunch && !dto.isDinner && !dto.isSnack && !dto.isSpecial) {
+                if (existing != null) {
+                    permissionRepository.delete(existing)
+                }
                 return@forEach
             }
 
-            // Если есть разрешение, должна быть причина
-            val reasonText = dto.reason ?: "Общее основание" // Дефолтная причина
+            val reasonText = dto.reason ?: "Общее основание"
 
             if (existing != null) {
                 existing.isBreakfastAllowed = dto.isBreakfast
@@ -89,7 +95,6 @@ class RosterService(
                 existing.isSnackAllowed = dto.isSnack
                 existing.isSpecialAllowed = dto.isSpecial
                 existing.reason = reasonText
-                // existing.assignedBy = assigner
                 permissionRepository.save(existing)
             } else {
                 permissionRepository.save(

@@ -6,7 +6,10 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
 import java.security.Principal
 import java.time.LocalDate
 
@@ -20,12 +23,13 @@ class CuratorStatsController(
 
     @GetMapping("/my-group")
     @PreAuthorize("hasAnyRole('CURATOR', 'ADMIN')")
-    @Operation(summary = "Статистика по моей группе (кто поел сегодня)")
+    @Operation(summary = "Статистика по группе куратора")
     fun getMyGroupStats(
         @RequestParam(required = false) date: LocalDate?,
+        @RequestParam(required = false) groupId: Int?,
         principal: Principal
     ): List<StudentMealStatus> {
         val targetDate = date ?: LocalDate.now()
-        return statisticsService.getGroupMealStatus(principal.name, targetDate)
+        return statisticsService.getGroupMealStatus(principal.name, targetDate, groupId)
     }
 }
