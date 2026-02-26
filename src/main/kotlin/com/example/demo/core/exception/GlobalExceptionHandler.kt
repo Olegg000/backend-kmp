@@ -8,6 +8,7 @@ import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import java.util.UUID
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -16,52 +17,95 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException::class)
     fun handleRuntime(e: RuntimeException): ResponseEntity<AppError> {
-        logger.error("Runtime exception occurred", e)
-        return ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(AppError(400, e.message ?: "Произошла ошибка"))
+        logger.error("Runtime exception", e)
+        return buildError(
+            status = HttpStatus.BAD_REQUEST,
+            code = "RUNTIME_ERROR",
+            technicalMessage = e.message ?: "Runtime error",
+            userMessage = e.message ?: "Request cannot be processed",
+            retryable = false
+        )
     }
 
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDenied(e: AccessDeniedException): ResponseEntity<AppError> {
         logger.warn("Access denied: ${e.message}")
-        return ResponseEntity
-            .status(HttpStatus.FORBIDDEN)
-            .body(AppError(403, "Нет прав доступа"))
+        return buildError(
+            status = HttpStatus.FORBIDDEN,
+            code = "ACCESS_DENIED",
+            technicalMessage = e.message ?: "Access denied",
+            userMessage = "You do not have access to this action",
+            retryable = false
+        )
     }
 
     @ExceptionHandler(BadCredentialsException::class)
     fun handleBadCredentials(e: BadCredentialsException): ResponseEntity<AppError> {
-        logger.warn("Bad credentials attempt")
-        return ResponseEntity
-            .status(HttpStatus.UNAUTHORIZED)
-            .body(AppError(401, "Неверный логин или пароль"))
+        logger.warn("Bad credentials")
+        return buildError(
+            status = HttpStatus.UNAUTHORIZED,
+            code = "INVALID_CREDENTIALS",
+            technicalMessage = e.message ?: "Invalid credentials",
+            userMessage = "Invalid login or password",
+            retryable = false
+        )
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(e: MethodArgumentNotValidException): ResponseEntity<AppError> {
-        val errors = e.bindingResult.fieldErrors.joinToString(", ") {
-            "${it.field}: ${it.defaultMessage}"
-        }
+        val errors = e.bindingResult.fieldErrors.joinToString(", ") { "${it.field}: ${it.defaultMessage}" }
         logger.warn("Validation failed: $errors")
-        return ResponseEntity
-            .status(HttpStatus.BAD_REQUEST)
-            .body(AppError(400, "Ошибка валидации: $errors"))
+        return buildError(
+            status = HttpStatus.BAD_REQUEST,
+            code = "VALIDATION_ERROR",
+            technicalMessage = errors,
+            userMessage = "Validation error: $errors",
+            retryable = false
+        )
     }
 
     @ExceptionHandler(IllegalStateException::class)
     fun handleIllegalState(e: IllegalStateException): ResponseEntity<AppError> {
         logger.error("Illegal state", e)
-        return ResponseEntity
-            .status(HttpStatus.CONFLICT)
-            .body(AppError(409, e.message ?: "Конфликт состояния"))
+        return buildError(
+            status = HttpStatus.CONFLICT,
+            code = "ILLEGAL_STATE",
+            technicalMessage = e.message ?: "State conflict",
+            userMessage = e.message ?: "State conflict",
+            retryable = false
+        )
     }
 
     @ExceptionHandler(Exception::class)
     fun handleGeneral(e: Exception): ResponseEntity<AppError> {
-        logger.error("Unexpected error", e)
-        return ResponseEntity
-            .status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(AppError(500, "Внутренняя ошибка сервера"))
+        logger.error("Unexpected exception", e)
+        return buildError(
+            status = HttpStatus.INTERNAL_SERVER_ERROR,
+            code = "INTERNAL_SERVER_ERROR",
+            technicalMessage = e.message ?: "Internal server error",
+            userMessage = "Internal server error. Please retry later.",
+            retryable = true
+        )
+    }
+
+    private fun buildError(
+        status: HttpStatus,
+        code: String,
+        technicalMessage: String,
+        userMessage: String,
+        retryable: Boolean
+    ): ResponseEntity<AppError> {
+        val requestId = UUID.randomUUID().toString()
+        return ResponseEntity.status(status).body(
+            AppError(
+                code = code,
+                message = technicalMessage,
+                userMessage = userMessage,
+                retryable = retryable,
+                status = status.value(),
+                requestId = requestId
+            )
+        )
     }
 }
+

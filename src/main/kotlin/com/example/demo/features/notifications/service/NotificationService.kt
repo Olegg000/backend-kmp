@@ -6,6 +6,7 @@ import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.NotificationRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.notifications.dto.NotificationDto
+import com.example.demo.features.notifications.dto.NotificationPageDto
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.DayOfWeek
@@ -21,13 +22,12 @@ class NotificationService(
 
     fun checkCuratorRosterStatus(curatorLogin: String): Map<String, Any> {
         val curator = userRepository.findByLogin(curatorLogin)
-            ?: throw RuntimeException("Куратор не найден")
+            ?: throw RuntimeException("Curator not found")
 
         val group = curator.group
-            ?: return mapOf("needsReminder" to false, "reason" to "Куратор не привязан к группе")
+            ?: return mapOf("needsReminder" to false, "reason" to "Curator is not assigned to group")
 
         val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-
         val students = userRepository.findAllByGroup(group)
         val datesNextWeek = (0..4).map { nextMonday.plusDays(it.toLong()) }
 
@@ -50,20 +50,52 @@ class NotificationService(
         return notificationRepository.countByUserAndIsReadFalse(user)
     }
 
-    fun getUserNotifications(login: String): List<NotificationDto> {
-        val user = userRepository.findByLogin(login) ?: return emptyList()
-        return notificationRepository.findAllByUserOrderByCreatedAtDesc(user).map {
-            NotificationDto(it.id!!, it.title, it.message, it.isRead, it.createdAt)
-        }
+    fun getUserNotificationsPage(login: String, cursor: Long?, limit: Int): NotificationPageDto {
+        val user = userRepository.findByLogin(login) ?: return NotificationPageDto(emptyList(), null, false)
+
+        val sorted = notificationRepository.findAllByUserOrderByCreatedAtDesc(user)
+            .sortedByDescending { it.id ?: Long.MIN_VALUE }
+
+        val filtered = if (cursor == null) sorted else sorted.filter { (it.id ?: Long.MIN_VALUE) < cursor }
+        val pageItems = filtered.take(limit)
+        val nextCursor = pageItems.lastOrNull()?.id
+        val hasMore = filtered.size > pageItems.size
+
+        return NotificationPageDto(
+            items = pageItems.map {
+                NotificationDto(
+                    id = it.id!!,
+                    title = it.title,
+                    message = it.message,
+                    isRead = it.isRead,
+                    createdAt = it.createdAt.toString()
+                )
+            },
+            nextCursor = nextCursor,
+            hasMore = hasMore
+        )
     }
 
     @Transactional
     fun markAsRead(login: String, notificationId: Long) {
-        val user = userRepository.findByLogin(login) ?: throw RuntimeException("Пользователь не найден")
-        val notification = notificationRepository.findById(notificationId).orElseThrow { RuntimeException("Уведомление не найдено") }
+        val user = userRepository.findByLogin(login) ?: throw RuntimeException("User not found")
+        val notification = notificationRepository.findById(notificationId).orElseThrow { RuntimeException("Notification not found") }
         if (notification.user.id == user.id) {
             notification.isRead = true
             notificationRepository.save(notification)
+        }
+    }
+
+    @Transactional
+    fun markAsReadBatch(login: String, ids: List<Long>) {
+        if (ids.isEmpty()) return
+        val user = userRepository.findByLogin(login) ?: throw RuntimeException("User not found")
+        ids.forEach { id ->
+            val notification = notificationRepository.findById(id).orElse(null) ?: return@forEach
+            if (notification.user.id == user.id && !notification.isRead) {
+                notification.isRead = true
+                notificationRepository.save(notification)
+            }
         }
     }
 
@@ -77,3 +109,4 @@ class NotificationService(
         notificationRepository.save(notification)
     }
 }
+
