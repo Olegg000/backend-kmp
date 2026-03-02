@@ -31,7 +31,7 @@ class NotificationService(
             "reason" to "Куратор не имеет id"
         )
 
-        val groups = groupRepository.findAllByCurator_Id(curatorId)
+        val groups = groupRepository.findAllByCuratorId(curatorId)
         if (groups.isEmpty()) {
             return mapOf("needsReminder" to false, "reason" to "Куратор не привязан к группам")
         }
@@ -89,8 +89,8 @@ class NotificationService(
 
     @Transactional
     fun markAsRead(login: String, notificationId: Long) {
-        val user = userRepository.findByLogin(login) ?: throw RuntimeException("User not found")
-        val notification = notificationRepository.findById(notificationId).orElseThrow { RuntimeException("Notification not found") }
+        val user = userRepository.findByLogin(login) ?: throw RuntimeException("Пользователь не найден")
+        val notification = notificationRepository.findById(notificationId).orElseThrow { RuntimeException("Уведомление не найдено") }
         if (notification.user.id == user.id) {
             notification.isRead = true
             notificationRepository.save(notification)
@@ -100,7 +100,7 @@ class NotificationService(
     @Transactional
     fun markAsReadBatch(login: String, ids: List<Long>) {
         if (ids.isEmpty()) return
-        val user = userRepository.findByLogin(login) ?: throw RuntimeException("User not found")
+        val user = userRepository.findByLogin(login) ?: throw RuntimeException("Пользователь не найден")
         ids.forEach { id ->
             val notification = notificationRepository.findById(id).orElse(null) ?: return@forEach
             if (notification.user.id == user.id && !notification.isRead) {

@@ -4,6 +4,7 @@ import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.features.groups.dto.CuratorSummary
 import com.example.demo.features.groups.dto.CreateGroupRequest
 import com.example.demo.features.groups.dto.GroupResponse
 import jakarta.transaction.Transactional
@@ -29,14 +30,14 @@ class GroupService(
         if (groupRepository.existsByGroupName(req.name)) {
             throw RuntimeException("Группа с таким названием уже существует")
         }
-        val group = GroupEntity(groupName = req.name, curator = null)
+        val group = GroupEntity(groupName = req.name)
         val saved = groupRepository.save(group)
         return toGroupResponse(saved)
     }
 
-    // 3. Назначить куратора
+    // 3. Добавить куратора в группу
     @Transactional
-    fun setCurator(groupId: Int, curatorId: UUID): GroupResponse {
+    fun addCurator(groupId: Int, curatorId: UUID): GroupResponse {
         val group = groupRepository.findByIdOrNull(groupId)
             ?: throw RuntimeException("Группа не найдена")
 
@@ -49,17 +50,20 @@ class GroupService(
             throw RuntimeException("Пользователь не имеет роли CURATOR")
         }
 
-        group.curator = user // Hibernate сам обновит связь
+        group.curators.add(user)
         return toGroupResponse(groupRepository.save(group))
     }
 
-    // 4. Убрать куратора
+    // 4. Убрать куратора из группы
     @Transactional
-    fun removeCurator(groupId: Int): GroupResponse {
+    fun removeCurator(groupId: Int, curatorId: UUID): GroupResponse {
         val group = groupRepository.findByIdOrNull(groupId)
             ?: throw RuntimeException("Группа не найдена")
 
-        group.curator = null
+        val user = userRepository.findByIdOrNull(curatorId)
+            ?: throw RuntimeException("Пользователь не найден")
+
+        group.curators.remove(user)
         return toGroupResponse(groupRepository.save(group))
     }
 
@@ -116,11 +120,16 @@ class GroupService(
         return GroupResponse(
             id = group.id ?: 0,
             name = group.groupName,
-            curatorId = group.curator?.id,
-            // Безопасное извлечение полей (null-safe)
-            curatorName = group.curator?.name,
-            curatorSurname = group.curator?.surname,
-            curatorFatherName = group.curator?.fatherName,
+            curators = group.curators
+                .sortedWith(compareBy({ it.surname }, { it.name }, { it.fatherName }))
+                .map {
+                    CuratorSummary(
+                        id = it.id!!,
+                        name = it.name,
+                        surname = it.surname,
+                        fatherName = it.fatherName
+                    )
+                },
             studentCount = count
         )
     }

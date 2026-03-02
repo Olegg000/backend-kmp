@@ -88,7 +88,7 @@ class FullFlowTest {
         privateKey = keys.second
 
         // === 1. Создание группы ===
-        group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 
         // === 2. Создание куратора ===
         curator = userRepository.save(
@@ -102,7 +102,7 @@ class FullFlowTest {
                 group = group
             )
         )
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         // === 3. Создание студента ===
@@ -144,7 +144,7 @@ class FullFlowTest {
         val rosterRequest = UpdateRosterRequest(
             studentId = student.id!!,
             permissions = listOf(
-                DayPermissionDto(today, true, true, false, false, false, "Учебный день")
+                DayPermissionDto(today, true, true, "Учебный день")
             )
         )
         rosterService.updateRoster(rosterRequest, curator.login)
@@ -287,9 +287,6 @@ class FullFlowTest {
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = true,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
 

@@ -35,9 +35,6 @@ class StudentService(
                 date = date,
                 isBreakfast = p?.isBreakfastAllowed ?: false,
                 isLunch = p?.isLunchAllowed ?: false,
-                isDinner = p?.isDinnerAllowed ?: false,
-                isSnack = p?.isSnackAllowed ?: false,
-                isSpecial = p?.isSpecialAllowed ?: false,
                 reason = p?.reason
             )
         }
@@ -71,15 +68,9 @@ class StudentService(
             date = today,
             isBreakfastAllowed = p?.isBreakfastAllowed ?: false,
             isLunchAllowed = p?.isLunchAllowed ?: false,
-            isDinnerAllowed = p?.isDinnerAllowed ?: false,
-            isSnackAllowed = p?.isSnackAllowed ?: false,
-            isSpecialAllowed = p?.isSpecialAllowed ?: false,
             reason = p?.reason,
             isBreakfastConsumed = MealType.BREAKFAST in consumedMealTypes,
-            isLunchConsumed = MealType.LUNCH in consumedMealTypes,
-            isDinnerConsumed = MealType.DINNER in consumedMealTypes,
-            isSnackConsumed = MealType.SNACK in consumedMealTypes,
-            isSpecialConsumed = MealType.SPECIAL in consumedMealTypes
+            isLunchConsumed = MealType.LUNCH in consumedMealTypes
         )
     }
 

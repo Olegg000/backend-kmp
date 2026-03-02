@@ -1,6 +1,7 @@
 package com.example.demo.features.roster.service
 
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
@@ -28,7 +29,7 @@ class RosterService(
             ?: throw RuntimeException("Куратор не найден")
 
         val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет id")
-        val curatorGroups = groupRepository.findAllByCurator_Id(curatorId)
+        val curatorGroups = groupRepository.findAllByCuratorId(curatorId)
         if (curatorGroups.isEmpty()) {
             throw RuntimeException("Куратор не привязан к группам")
         }
@@ -54,9 +55,7 @@ class RosterService(
                     date = date,
                     isBreakfast = perm?.isBreakfastAllowed ?: false,
                     isLunch = perm?.isLunchAllowed ?: false,
-                    isDinner = perm?.isDinnerAllowed ?: false,
-                    isSnack = perm?.isSnackAllowed ?: false,
-                    isSpecial = perm?.isSpecialAllowed ?: false
+                    reason = perm?.reason
                 )
             }
 
@@ -79,11 +78,15 @@ class RosterService(
         req.permissions.forEach { dto ->
             val existing = permissionRepository.findByStudentAndDate(student, dto.date)
 
-            if (!dto.isBreakfast && !dto.isLunch && !dto.isDinner && !dto.isSnack && !dto.isSpecial) {
+            if (!dto.isBreakfast && !dto.isLunch) {
                 if (existing != null) {
                     permissionRepository.delete(existing)
                 }
                 return@forEach
+            }
+
+            if (student.studentCategory == StudentCategory.MANY_CHILDREN && dto.isBreakfast && dto.isLunch) {
+                throw RuntimeException("Категории 'Многодетные' можно назначить только один прием пищи в день")
             }
 
             val reasonText = dto.reason ?: "Общее основание"
@@ -91,9 +94,6 @@ class RosterService(
             if (existing != null) {
                 existing.isBreakfastAllowed = dto.isBreakfast
                 existing.isLunchAllowed = dto.isLunch
-                existing.isDinnerAllowed = dto.isDinner
-                existing.isSnackAllowed = dto.isSnack
-                existing.isSpecialAllowed = dto.isSpecial
                 existing.reason = reasonText
                 permissionRepository.save(existing)
             } else {
@@ -104,10 +104,7 @@ class RosterService(
                         assignedBy = assigner,
                         reason = reasonText,
                         isBreakfastAllowed = dto.isBreakfast,
-                        isLunchAllowed = dto.isLunch,
-                        isDinnerAllowed = dto.isDinner,
-                        isSnackAllowed = dto.isSnack,
-                        isSpecialAllowed = dto.isSpecial
+                        isLunchAllowed = dto.isLunch
                     )
                 )
             }

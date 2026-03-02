@@ -46,7 +46,7 @@ class TransactionsControllerTest(
      * Возвращаем токен повара и студента.
      */
     private fun setupChefAndStudent(): Triple<String, String, UserEntity> {
-        val group = groupRepository.save(GroupEntity(groupName = "ИКБО-21", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "ИКБО-21"))
 
         val curator = userRepository.save(
             UserEntity(
@@ -59,7 +59,7 @@ class TransactionsControllerTest(
                 group = group
             )
         )
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         val student = userRepository.save(
@@ -94,9 +94,6 @@ class TransactionsControllerTest(
                 reason = "Тест",
                 isBreakfastAllowed = false,
                 isLunchAllowed = true,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
 

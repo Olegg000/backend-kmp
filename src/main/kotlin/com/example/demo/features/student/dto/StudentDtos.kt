@@ -16,14 +16,8 @@ data class StudentTodayMealsDto(
     val date: LocalDate,
     val isBreakfastAllowed: Boolean,
     val isLunchAllowed: Boolean,
-    val isDinnerAllowed: Boolean,
-    val isSnackAllowed: Boolean,
-    val isSpecialAllowed: Boolean,
     val reason: String?,
     // Добавлено: информация о том, какие приемы пищи уже использованы
     val isBreakfastConsumed: Boolean = false,
-    val isLunchConsumed: Boolean = false,
-    val isDinnerConsumed: Boolean = false,
-    val isSnackConsumed: Boolean = false,
-    val isSpecialConsumed: Boolean = false
+    val isLunchConsumed: Boolean = false
 )

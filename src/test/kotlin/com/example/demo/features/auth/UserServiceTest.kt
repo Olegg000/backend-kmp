@@ -2,6 +2,7 @@ package com.example.demo.features.auth
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
@@ -183,14 +184,15 @@ class UserServiceTest {
     @DisplayName("Автоматическое создание пользователя генерирует логин и пароль")
     fun `createUserAuto should generate login and password`() {
         // Given
-        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 
         val request = CreateUserRequest(
             roles = mutableSetOf(Role.STUDENT),
             name = "Петр",
             surname = "Петров",
             fatherName = "Петрович",
-            groupId = group.id   // студенту обязательна группа
+            groupId = group.id,   // студенту обязательна группа
+            studentCategory = StudentCategory.MANY_CHILDREN
         )
 
         // When
@@ -213,7 +215,8 @@ class UserServiceTest {
             name = "Test",
             surname = "Test",
             fatherName = "Test",
-            groupId = null // Группа не указана!
+            groupId = null, // Группа не указана!
+            studentCategory = StudentCategory.MANY_CHILDREN
         )
 
         // When & Then
@@ -303,7 +306,7 @@ class UserServiceTest {
     @DisplayName("Импорт студентов из CSV создает пользователей")
     fun `importStudentsFromCsv should create students`() {
         // Given
-        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 
         val csv = """
             Фамилия,Имя,Отчество,Группа

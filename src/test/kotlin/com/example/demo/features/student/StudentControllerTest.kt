@@ -38,7 +38,7 @@ class StudentControllerTest(
 ) {
 
     private fun createStudentWithPermissions(): Pair<String, UserEntity> {
-        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 
         val student = userRepository.save(
             UserEntity(
@@ -61,9 +61,6 @@ class StudentControllerTest(
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = true,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
 
@@ -84,7 +81,6 @@ class StudentControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.isBreakfastAllowed").value(true))
             .andExpect(jsonPath("$.isLunchAllowed").value(true))
-            .andExpect(jsonPath("$.isDinnerAllowed").value(false))
     }
 
     @Test

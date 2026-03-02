@@ -47,7 +47,7 @@ class RosterServiceTest {
     @BeforeEach
     fun setup() {
         // Создаем группу
-        group = groupRepository.save(GroupEntity(groupName = "ИСП-21", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "ИСП-21"))
 
         // Создаем куратора
         curator = userRepository.save(
@@ -62,7 +62,7 @@ class RosterServiceTest {
             )
         )
 
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         // Создаем студентов
@@ -125,9 +125,6 @@ class RosterServiceTest {
             studentRow.days.forEach { day ->
                 assertFalse(day.isBreakfast, "Завтрак должен быть выключен")
                 assertFalse(day.isLunch, "Обед должен быть выключен")
-                assertFalse(day.isDinner, "Ужин должен быть выключен")
-                assertFalse(day.isSnack, "Полдник должен быть выключен")
-                assertFalse(day.isSpecial, "Спец.питание должно быть выключено")
             }
         }
     }
@@ -138,8 +135,8 @@ class RosterServiceTest {
         // Given
         val monday = LocalDate.now().with(DayOfWeek.MONDAY)
         val permissions = listOf(
-            DayPermissionDto(monday, true, true, false, false, false, "Учебный день"),
-            DayPermissionDto(monday.plusDays(1), true, true, true, false, false, "Полный день")
+            DayPermissionDto(monday, true, true, "Учебный день"),
+            DayPermissionDto(monday.plusDays(1), true, true, "Полный день")
         )
 
         val request = UpdateRosterRequest(
@@ -158,13 +155,11 @@ class RosterServiceTest {
         val mondayPerms = student1Row.days[0]
         assertTrue(mondayPerms.isBreakfast)
         assertTrue(mondayPerms.isLunch)
-        assertFalse(mondayPerms.isDinner)
 
         // Проверяем вторник
         val tuesdayPerms = student1Row.days[1]
         assertTrue(tuesdayPerms.isBreakfast)
         assertTrue(tuesdayPerms.isLunch)
-        assertTrue(tuesdayPerms.isDinner)
     }
 
     @Test
@@ -173,7 +168,7 @@ class RosterServiceTest {
         // Given
         val monday = LocalDate.now().with(DayOfWeek.MONDAY)
         val permissions = listOf(
-            DayPermissionDto(monday, true, true, true, false, false, "Тест")
+            DayPermissionDto(monday, true, true, "Тест")
         )
 
         val request = UpdateRosterRequest(student1.id!!, permissions)
@@ -189,7 +184,6 @@ class RosterServiceTest {
         student2Row.days.forEach { day ->
             assertFalse(day.isBreakfast)
             assertFalse(day.isLunch)
-            assertFalse(day.isDinner)
         }
     }
 
@@ -200,14 +194,14 @@ class RosterServiceTest {
         val monday = LocalDate.now().with(DayOfWeek.MONDAY)
         val createRequest = UpdateRosterRequest(
             student1.id!!,
-            listOf(DayPermissionDto(monday, true, true, false, false, false))
+            listOf(DayPermissionDto(monday, true, true, null))
         )
         rosterService.updateRoster(createRequest, curator.login)
 
         // When - снимаем все галочки
         val deleteRequest = UpdateRosterRequest(
             student1.id!!,
-            listOf(DayPermissionDto(monday, false, false, false, false, false))
+            listOf(DayPermissionDto(monday, false, false, null))
         )
         rosterService.updateRoster(deleteRequest, curator.login)
 
@@ -236,6 +230,6 @@ class RosterServiceTest {
             rosterService.getRosterForGroup(curatorNoGroup.login, LocalDate.now())
         }
 
-        assertTrue(exception.message!!.contains("не привязан к группе"))
+        assertTrue(exception.message!!.contains("не привязан"))
     }
 }

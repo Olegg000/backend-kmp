@@ -1,6 +1,7 @@
 package com.example.demo.features.auth.service
 
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.PasswordResetLogEntity
 import com.example.demo.core.database.entity.UserEntity
@@ -68,7 +69,7 @@ class UserServiceQ(
 
         // 2. Достаем пользователя
         val user = userRepository.findByLogin(request.login)
-            ?: throw RuntimeException("User not found") // В реальности не случится, если authenticate прошел
+            ?: throw RuntimeException("Пользователь не найден") // В реальности не случится, если authenticate прошел
 
         // 3. ПРОВЕРКА КЛЮЧЕЙ (Фишка твоего проекта)
         // Если пользователь зашел первый раз или у него нет ключей - генерируем
@@ -97,14 +98,15 @@ class UserServiceQ(
             name = user.name,
             surname = user.surname,
             fatherName = user.fatherName,
-            groupId = user.group?.id
+            groupId = user.group?.id,
+            studentCategory = user.studentCategory
         )
     }
 
     @Transactional
     fun getMyKeys(login: String): com.example.demo.features.auth.dto.AuthKeysDto {
         val user = userRepository.findByLogin(login)
-            ?: throw RuntimeException("User not found")
+            ?: throw RuntimeException("Пользователь не найден")
             
         // Если ключей почему-то нет (хотя создаются при первом входе), можно генерировать
         if (user.publicKey == null || user.encryptedPrivateKey == null) {
@@ -133,6 +135,7 @@ class UserServiceQ(
             groupEntity = groupRepository.findById(dto.groupId)
                 .orElseThrow { RuntimeException("Группа не найдена") }
         }
+        validateStudentFields(dto.roles, dto.groupId, dto.studentCategory)
 
         // 3. Создание сущности
         val user = UserEntity(
@@ -142,7 +145,8 @@ class UserServiceQ(
             name = dto.name,
             surname = dto.surname,
             fatherName = dto.fatherName,
-            group = groupEntity
+            group = groupEntity,
+            studentCategory = if (dto.roles.contains(Role.STUDENT)) dto.studentCategory else null
         )
 
         userRepository.save(user)
@@ -173,6 +177,7 @@ class UserServiceQ(
             groupEntity = groupRepository.findByIdOrNull(req.groupId)
                 ?: throw RuntimeException("Группа не найдена")
         }
+        validateStudentFields(req.roles, req.groupId, req.studentCategory)
 
         // 4. Создаем Entity с сетом ролей
         val user = UserEntity(
@@ -182,7 +187,8 @@ class UserServiceQ(
             name = req.name,
             surname = req.surname,
             fatherName = req.fatherName,
-            group = groupEntity
+            group = groupEntity,
+            studentCategory = if (req.roles.contains(Role.STUDENT)) req.studentCategory else null
         )
         val saved = userRepository.save(user)
 
@@ -197,7 +203,7 @@ class UserServiceQ(
     @Transactional
     fun resetPassword(userId: UUID, requestedByLogin: String? = null): UserCredentialsResponse {
         val user = userRepository.findByIdOrNull(userId)
-            ?: throw RuntimeException("User not found")
+            ?: throw RuntimeException("Пользователь не найден")
 
         val now = LocalDateTime.now()
         val start = now.minusDays(1)
@@ -257,7 +263,8 @@ class UserServiceQ(
                     name = name,
                     surname = surname,
                     fatherName = fatherName,
-                    groupId = group.id
+                    groupId = group.id,
+                    studentCategory = StudentCategory.MANY_CHILDREN
                 )
                 // Вызываем наш метод авто-создания
                 createUserAuto(req)
@@ -275,6 +282,13 @@ class UserServiceQ(
             ?: throw RuntimeException("Пользователь не найден")
 
         user.roles = newRoles.toMutableSet()
+        if (!newRoles.contains(Role.STUDENT)) {
+            user.studentCategory = null
+            user.group = null
+        } else {
+            if (user.group == null) throw RuntimeException("Студент должен быть привязан к группе")
+            if (user.studentCategory == null) throw RuntimeException("Студенту требуется категория")
+        }
         val saved = userRepository.save(user)
 
         return AdminUserDto(
@@ -284,7 +298,29 @@ class UserServiceQ(
             name = saved.name,
             surname = saved.surname,
             fatherName = saved.fatherName,
-            groupId = saved.group?.id
+            groupId = saved.group?.id,
+            studentCategory = saved.studentCategory
+        )
+    }
+
+    @Transactional
+    fun updateStudentCategory(userId: UUID, category: StudentCategory): AdminUserDto {
+        val user = userRepository.findByIdOrNull(userId)
+            ?: throw RuntimeException("Пользователь не найден")
+        if (!user.roles.contains(Role.STUDENT)) {
+            throw RuntimeException("Категорию можно менять только студенту")
+        }
+        user.studentCategory = category
+        val saved = userRepository.save(user)
+        return AdminUserDto(
+            userId = saved.id!!,
+            login = saved.login,
+            roles = saved.roles,
+            name = saved.name,
+            surname = saved.surname,
+            fatherName = saved.fatherName,
+            groupId = saved.group?.id,
+            studentCategory = saved.studentCategory
         )
     }
 
@@ -329,9 +365,20 @@ class UserServiceQ(
                 name = it.name,
                 surname = it.surname,
                 fatherName = it.fatherName,
-                groupId = it.group?.id
+                groupId = it.group?.id,
+                studentCategory = it.studentCategory
             )
         }
+    }
+
+    private fun validateStudentFields(
+        roles: Set<Role>,
+        groupId: Int?,
+        category: StudentCategory?
+    ) {
+        if (!roles.contains(Role.STUDENT)) return
+        if (groupId == null) throw RuntimeException("Студенту нужна группа")
+        if (category == null) throw RuntimeException("Студенту нужна категория")
     }
 
 }

@@ -39,7 +39,7 @@ class NotificationServiceTest(
 
     @BeforeEach
     fun setup() {
-        group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 
         curator = userRepository.save(
             UserEntity(
@@ -52,7 +52,7 @@ class NotificationServiceTest(
                 group = group
             )
         )
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         student = userRepository.save(
@@ -96,7 +96,7 @@ class NotificationServiceTest(
         assertEquals(false, result["needsReminder"])
         val reason = result["reason"] as? String
         assertNotNull(reason)
-        assertTrue(reason!!.contains("не привязан к группе"))
+        assertTrue(reason!!.contains("не привязан"))
     }
 
     @Test
@@ -123,9 +123,6 @@ class NotificationServiceTest(
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = false,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
 

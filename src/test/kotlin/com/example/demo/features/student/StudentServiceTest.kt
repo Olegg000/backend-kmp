@@ -51,7 +51,7 @@ class StudentServiceTest {
 
     @BeforeEach
     fun setup() {
-        val group = groupRepository.save(GroupEntity(groupName = "Test Group", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "Test Group"))
 
         curator = userRepository.save(
             UserEntity(
@@ -88,7 +88,7 @@ class StudentServiceTest {
             )
         )
 
-        // Даем разрешения на все приемы пищи
+        // Даем разрешения на завтрак и обед
         permissionRepository.save(
             MealPermissionEntity(
                 date = LocalDate.now(),
@@ -97,9 +97,6 @@ class StudentServiceTest {
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = true,
-                isDinnerAllowed = true,
-                isSnackAllowed = true,
-                isSpecialAllowed = true
             )
         )
     }
@@ -114,15 +111,9 @@ class StudentServiceTest {
         assertEquals(LocalDate.now(), result.date)
         assertTrue(result.isBreakfastAllowed)
         assertTrue(result.isLunchAllowed)
-        assertTrue(result.isDinnerAllowed)
-        assertTrue(result.isSnackAllowed)
-        assertTrue(result.isSpecialAllowed)
         
         assertFalse(result.isBreakfastConsumed)
         assertFalse(result.isLunchConsumed)
-        assertFalse(result.isDinnerConsumed)
-        assertFalse(result.isSnackConsumed)
-        assertFalse(result.isSpecialConsumed)
     }
 
     @Test
@@ -146,7 +137,6 @@ class StudentServiceTest {
         // Then
         assertTrue(result.isBreakfastConsumed, "Завтрак должен быть помечен как использованный")
         assertFalse(result.isLunchConsumed, "Обед не должен быть помечен")
-        assertFalse(result.isDinnerConsumed, "Ужин не должен быть помечен")
     }
 
     @Test
@@ -180,9 +170,6 @@ class StudentServiceTest {
         // Then
         assertTrue(result.isBreakfastConsumed)
         assertTrue(result.isLunchConsumed)
-        assertFalse(result.isDinnerConsumed)
-        assertFalse(result.isSnackConsumed)
-        assertFalse(result.isSpecialConsumed)
     }
 
     @Test

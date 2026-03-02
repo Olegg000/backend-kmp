@@ -7,14 +7,18 @@ data class CreateGroupRequest(
     val name: String
 )
 
+data class CuratorSummary(
+    val id: UUID,
+    val name: String,
+    val surname: String,
+    val fatherName: String
+)
+
 // Ответ: Данные о группе (для списков)
 data class GroupResponse(
     val id: Int,
     val name: String,
-    val curatorId: UUID?,
-    val curatorName: String?,
-    val curatorSurname: String?,
-    val curatorFatherName: String?,
+    val curators: List<CuratorSummary>,
     val studentCount: Int
 )
 

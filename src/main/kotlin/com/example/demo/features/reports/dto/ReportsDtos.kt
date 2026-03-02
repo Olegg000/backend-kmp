@@ -1,21 +1,28 @@
 package com.example.demo.features.reports.dto
 
+import com.example.demo.core.database.StudentCategory
 import java.time.LocalDate
+import java.util.UUID
 
-data class DailyReportResponse(
+enum class AssignedByRoleFilter {
+    ALL,
+    ADMIN,
+    CURATOR
+}
+
+enum class AssignedByRole {
+    ADMIN,
+    CURATOR
+}
+
+data class ConsumptionReportRow(
     val date: LocalDate,
-    val breakfastCount: Long,
-    val lunchCount: Long,
-    val dinnerCount: Long,
-    val snackCount: Long,
-    val specialCount: Long,
-    val totalCount: Long,
-    val offlineTransactions: Long // Сколько было оффлайн-транзакций (для контроля)
-)
-
-data class GroupReportResponse(
+    val groupId: Int,
     val groupName: String,
-    val totalStudents: Int,
-    val studentsWhoAte: Int,
-    val percentage: Double
+    val studentId: UUID,
+    val studentName: String,
+    val category: StudentCategory,
+    val assignedByRole: AssignedByRole,
+    val breakfastUsed: Boolean,
+    val lunchUsed: Boolean
 )

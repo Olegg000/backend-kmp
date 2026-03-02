@@ -40,21 +40,24 @@ class GroupController(
 
     // --- Управление Куратором ---
 
-    @PutMapping("/{groupId}/curator/{curatorId}")
+    @PostMapping("/{groupId}/curators/{curatorId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
-    @Operation(summary = "Назначить куратора группе")
-    fun setCurator(
+    @Operation(summary = "Добавить куратора группе")
+    fun addCurator(
         @PathVariable groupId: Int,
         @PathVariable curatorId: UUID
     ): GroupResponse {
-        return groupService.setCurator(groupId, curatorId)
+        return groupService.addCurator(groupId, curatorId)
     }
 
-    @DeleteMapping("/{groupId}/curator")
+    @DeleteMapping("/{groupId}/curators/{curatorId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
-    @Operation(summary = "Снять куратора с группы")
-    fun removeCurator(@PathVariable groupId: Int): GroupResponse {
-        return groupService.removeCurator(groupId)
+    @Operation(summary = "Убрать куратора из группы")
+    fun removeCurator(
+        @PathVariable groupId: Int,
+        @PathVariable curatorId: UUID
+    ): GroupResponse {
+        return groupService.removeCurator(groupId, curatorId)
     }
 
     // --- Управление Студентами ---

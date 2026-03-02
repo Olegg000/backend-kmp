@@ -40,7 +40,7 @@ class NotificationControllerTest(
 
     @Test
     fun `GET roster-deadline returns JSON for curator`() {
-        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 
         val curator = userRepository.save(
             UserEntity(
@@ -53,7 +53,7 @@ class NotificationControllerTest(
                 group = group
             )
         )
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         val token = jwtUtils.generateToken(curator.login, curator.roles)
@@ -71,7 +71,7 @@ class NotificationControllerTest(
     @Test
     @DisplayName("Если на следующую неделю есть разрешение — needsReminder=false")
     fun `GET roster-deadline returns no reminder when next week has permissions`() {
-        val group = groupRepository.save(GroupEntity(groupName = "ПИ-22", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "ПИ-22"))
 
         val curator = userRepository.save(
             UserEntity(
@@ -84,7 +84,7 @@ class NotificationControllerTest(
                 group = group
             )
         )
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         val student = userRepository.save(
@@ -110,9 +110,6 @@ class NotificationControllerTest(
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = false,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
 

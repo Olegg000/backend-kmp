@@ -45,7 +45,7 @@ class ReportsPdfControllerTest(
         val today = LocalDate.now()
 
         mockMvc.perform(
-            get("/api/v1/reports/export/pdf")
+            get("/api/v1/reports/consumption/export/pdf")
                 .header("Authorization", "Bearer $token")
                 .param("startDate", today.toString())
                 .param("endDate", today.toString())

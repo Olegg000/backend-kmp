@@ -1,6 +1,7 @@
 package com.example.demo.features.auth.dto
 
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import java.util.UUID
 
 data class RegistrationDto(
@@ -10,7 +11,8 @@ data class RegistrationDto(
     val name: String,
     val surname: String,
     val fatherName: String,
-    val groupId: Int? = null // Опционально, только для студентов
+    val groupId: Int? = null, // Опционально, только для студентов
+    val studentCategory: StudentCategory? = null
 )
 
 data class CreateUserRequest(
@@ -18,7 +20,8 @@ data class CreateUserRequest(
     val name: String,
     val surname: String,
     val fatherName: String,
-    val groupId: Int? = null
+    val groupId: Int? = null,
+    val studentCategory: StudentCategory? = null
 )
 
 data class UserCredentialsResponse(
@@ -26,4 +29,8 @@ data class UserCredentialsResponse(
     val login: String,
     val passwordClearText: String, // Пароль в открытом виде (показываем 1 раз!)
     val fullName: String
+)
+
+data class UpdateUserCategoryRequest(
+    val studentCategory: StudentCategory
 )

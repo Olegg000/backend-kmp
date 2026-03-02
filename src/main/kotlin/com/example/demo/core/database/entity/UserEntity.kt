@@ -1,6 +1,7 @@
 package com.example.demo.core.database.entity
 
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import jakarta.persistence.*
 import java.util.UUID
 
@@ -33,6 +34,10 @@ class UserEntity(
     @ManyToOne
     @JoinColumn(name = "group_id")
     var group: GroupEntity? = null,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "student_category")
+    var studentCategory: StudentCategory? = null,
 
     @Column(columnDefinition = "TEXT")
     var publicKey: String? = null,

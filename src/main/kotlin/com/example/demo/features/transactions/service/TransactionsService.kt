@@ -1,6 +1,7 @@
 package com.example.demo.features.transactions.service
 
 import com.example.demo.core.database.MealType
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.core.database.entity.SuspiciousTransactionEntity
 import com.example.demo.core.database.entity.UserEntity
@@ -86,18 +87,21 @@ class TransactionsService(
             throw RuntimeException("Студент уже получил ${item.mealType} за эту дату!")
         }
 
+        if (student.studentCategory == StudentCategory.MANY_CHILDREN) {
+            val hasAnyMealToday = transactionRepository.findAllByStudentAndTimeStampBetween(
+                student, startOfDay, endOfDay
+            ).isNotEmpty()
+            if (hasAnyMealToday) {
+                throw RuntimeException("Категория 'Многодетные' допускает только один прием пищи в день")
+            }
+        }
+
         // 5. Permission Check: Есть ли галочка в табеле?
         val permission = permissionRepository.findByStudentAndDate(student, dateOfMeal)
 
-        // ВОТ ТУТ ВАЖНОЕ ОБНОВЛЕНИЕ ДЛЯ ПОЛДНИКА И СПЕЦ. ПИТАНИЯ
         val isAllowed = when (item.mealType) {
             MealType.BREAKFAST -> permission?.isBreakfastAllowed == true
             MealType.LUNCH -> permission?.isLunchAllowed == true
-            MealType.DINNER -> permission?.isDinnerAllowed == true
-            MealType.SNACK -> permission?.isSnackAllowed == true     // Добавил
-            MealType.SPECIAL -> permission?.isSpecialAllowed == true // Добавил
-            // Если добавишь что-то новое в Enum, но забудешь тут - по дефолту запрещено
-            else -> false
         }
 
         if (!isAllowed) {

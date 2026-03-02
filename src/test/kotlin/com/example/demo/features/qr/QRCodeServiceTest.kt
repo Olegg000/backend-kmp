@@ -77,7 +77,7 @@ class QRCodeServiceTest {
 
         // When - пытаемся проверить с другим mealType
         val isValid = qrCodeService.verifySignature(
-            userId, timestamp, MealType.DINNER, nonce, signature, publicKey
+            userId, timestamp, MealType.BREAKFAST, nonce, signature, publicKey
         )
 
         // Then

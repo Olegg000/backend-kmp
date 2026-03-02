@@ -22,8 +22,4 @@ interface UserRepository: JpaRepository<UserEntity, UUID> {
 
     // Проверка существования пользователя по логину
     fun existsByLogin(login: String): Boolean
-
-    // Найти куратора группы
-    @Query("SELECT g.curator FROM GroupEntity g WHERE g.id = :groupId")
-    fun findCuratorByGroupId(@Param("groupId") groupId: Int): UserEntity?
 }

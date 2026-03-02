@@ -22,7 +22,7 @@ class StatisticsService(
             ?: throw RuntimeException("Куратор не найден")
 
         val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет id")
-        val curatorGroups = groupRepository.findAllByCurator_Id(curatorId)
+        val curatorGroups = groupRepository.findAllByCuratorId(curatorId)
         if (curatorGroups.isEmpty()) {
             throw RuntimeException("Куратор не привязан к группам")
         }
@@ -52,10 +52,7 @@ class StatisticsService(
                 studentId = student.id!!,
                 fullName = "${student.surname} ${student.name}",
                 hadBreakfast = transactions.any { it.mealType == MealType.BREAKFAST },
-                hadLunch = transactions.any { it.mealType == MealType.LUNCH },
-                hadDinner = transactions.any { it.mealType == MealType.DINNER },
-                hadSnack = transactions.any { it.mealType == MealType.SNACK },
-                hadSpecial = transactions.any { it.mealType == MealType.SPECIAL }
+                hadLunch = transactions.any { it.mealType == MealType.LUNCH }
             )
         }
     }

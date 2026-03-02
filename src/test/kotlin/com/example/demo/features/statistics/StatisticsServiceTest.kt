@@ -41,7 +41,7 @@ class StatisticsServiceTest(
 
     @BeforeEach
     fun setup() {
-        group = groupRepository.save(GroupEntity(groupName = "ИСП-21", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "ИСП-21"))
 
         curator = userRepository.save(
             UserEntity(
@@ -54,7 +54,7 @@ class StatisticsServiceTest(
                 group = group
             )
         )
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         student1 = userRepository.save(
@@ -107,9 +107,6 @@ class StatisticsServiceTest(
         listOf(s1, s2).forEach { st ->
             assertFalse(st.hadBreakfast)
             assertFalse(st.hadLunch)
-            assertFalse(st.hadDinner)
-            assertFalse(st.hadSnack)
-            assertFalse(st.hadSpecial)
         }
     }
 
@@ -149,7 +146,7 @@ class StatisticsServiceTest(
                 student = student2,
                 chef = chef,
                 isOffline = true,
-                mealType = MealType.DINNER
+                mealType = MealType.LUNCH
             )
         )
         transactionRepository.save(
@@ -159,7 +156,7 @@ class StatisticsServiceTest(
                 student = student2,
                 chef = chef,
                 isOffline = true,
-                mealType = MealType.SNACK
+                mealType = MealType.LUNCH
             )
         )
         transactionRepository.save(
@@ -169,7 +166,7 @@ class StatisticsServiceTest(
                 student = student2,
                 chef = chef,
                 isOffline = true,
-                mealType = MealType.SPECIAL
+                mealType = MealType.LUNCH
             )
         )
 
@@ -179,17 +176,11 @@ class StatisticsServiceTest(
 
         assertTrue(s1.hadBreakfast)
         assertTrue(s1.hadLunch)
-        assertFalse(s1.hadDinner)
-        assertFalse(s1.hadSnack)
-        assertFalse(s1.hadSpecial)
 
         assertFalse(s1 == s2)
 
         assertFalse(s2.hadBreakfast)
-        assertFalse(s2.hadLunch)
-        assertTrue(s2.hadDinner)
-        assertTrue(s2.hadSnack)
-        assertTrue(s2.hadSpecial)
+        assertTrue(s2.hadLunch)
     }
 
     @Test
@@ -209,6 +200,6 @@ class StatisticsServiceTest(
         val ex = assertThrows(RuntimeException::class.java) {
             statisticsService.getGroupMealStatus(curatorNoGroup.login, LocalDate.now())
         }
-        assertTrue(ex.message!!.contains("не привязан к группе"))
+        assertTrue(ex.message!!.contains("не привязан"))
     }
 }

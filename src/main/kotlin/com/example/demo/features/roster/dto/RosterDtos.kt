@@ -15,9 +15,6 @@ data class DayPermissionDto(
     val date: LocalDate,
     val isBreakfast: Boolean,
     val isLunch: Boolean,
-    val isDinner: Boolean,
-    val isSnack: Boolean = false,      // Полдник
-    val isSpecial: Boolean = false,    // Спец. питание
     val reason: String? = null // Причина (если не ест)
 )
 

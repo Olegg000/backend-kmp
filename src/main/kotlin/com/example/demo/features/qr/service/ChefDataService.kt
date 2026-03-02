@@ -48,10 +48,7 @@ class ChefDataService(
                 name = student.name,
                 surname = student.surname,
                 breakfast = perm.isBreakfastAllowed,
-                lunch = perm.isLunchAllowed,
-                dinner = perm.isDinnerAllowed,
-                snack = perm.isSnackAllowed,
-                special = perm.isSpecialAllowed
+                lunch = perm.isLunchAllowed
             )
         }
     }

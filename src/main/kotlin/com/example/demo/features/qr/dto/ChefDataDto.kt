@@ -22,8 +22,5 @@ data class StudentPermissionDto(
     val name: String,
     val surname: String,
     val breakfast: Boolean,
-    val lunch: Boolean,
-    val dinner: Boolean,
-    val snack: Boolean,
-    val special: Boolean
+    val lunch: Boolean
 )

@@ -1,6 +1,7 @@
 package com.example.demo.features.auth.dto
 
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import java.util.UUID
 
 data class Auth (
@@ -19,7 +20,8 @@ data class AuthReturns(
     val name: String,
     val surname: String,
     val fatherName: String,
-    val groupId: Int?
+    val groupId: Int?,
+    val studentCategory: StudentCategory?
 )
 
 data class RegUser (
@@ -42,7 +44,8 @@ data class AdminUserDto(
     val name: String,
     val surname: String,
     val fatherName: String,
-    val groupId: Int?
+    val groupId: Int?,
+    val studentCategory: StudentCategory?
 )
 
 data class AuthKeysDto(

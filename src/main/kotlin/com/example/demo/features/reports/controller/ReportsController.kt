@@ -1,6 +1,7 @@
 package com.example.demo.features.reports.controller
 
-import com.example.demo.features.reports.dto.DailyReportResponse
+import com.example.demo.features.reports.dto.AssignedByRoleFilter
+import com.example.demo.features.reports.dto.ConsumptionReportRow
 import com.example.demo.features.reports.service.ReportsPdfService
 import com.example.demo.features.reports.service.ReportsService
 import io.swagger.v3.oas.annotations.Operation
@@ -11,62 +12,85 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
+import java.security.Principal
 import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/v1/reports")
 @SecurityRequirement(name = "bearerAuth")
-@Tag(name = "Reports", description = "Отчетность для администрации")
+@Tag(name = "Reports", description = "Детальные отчёты по питанию")
 class ReportsController(
     private val reportsService: ReportsService,
     private val reportsPdfService: ReportsPdfService
 ) {
 
-    @GetMapping("/daily")
-    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
-    @Operation(summary = "Отчет за день (сколько студентов поело)")
-    fun getDailyReport(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) date: LocalDate
-    ): DailyReportResponse {
-        return reportsService.generateDailyReport(date)
-    }
-
-    @GetMapping("/weekly")
-    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
-    @Operation(summary = "Отчет за неделю (по дням)")
-    fun getWeeklyReport(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate
-    ): List<DailyReportResponse> {
-        return reportsService.generateWeeklyReport(startDate)
-    }
-
-    @GetMapping("/export/csv")
-    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
-    @Operation(summary = "Экспорт отчета в CSV")
-    fun exportCSV(
+    @GetMapping("/consumption")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CURATOR')")
+    @Operation(summary = "Детальный отчёт по факту питания (студент × день)")
+    fun getConsumptionReport(
+        principal: Principal,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
+        @RequestParam(required = false) groupId: Int?,
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
+    ): List<ConsumptionReportRow> {
+        return reportsService.generateConsumptionReport(
+            currentLogin = principal.name,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRole
+        )
+    }
+
+    @GetMapping("/consumption/export/csv")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CURATOR')")
+    @Operation(summary = "Экспорт детального отчёта по питанию в CSV")
+    fun exportConsumptionCsv(
+        principal: Principal,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
+        @RequestParam(required = false) groupId: Int?,
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
     ): ResponseEntity<ByteArray> {
-        val csv = reportsService.exportToCSV(startDate, endDate)
+        val csv = reportsService.exportToCsv(
+            currentLogin = principal.name,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRole
+        )
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report_${startDate}_${endDate}.csv")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=consumption_${startDate}_${endDate}.csv")
             .contentType(MediaType.parseMediaType("text/csv"))
             .body(csv.toByteArray())
     }
 
-    @GetMapping("/export/pdf")
-    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
-    @Operation(summary = "Экспорт отчета в PDF")
-    fun exportPdf(
+    @GetMapping("/consumption/export/pdf")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CURATOR')")
+    @Operation(summary = "Экспорт детального отчёта по питанию в PDF")
+    fun exportConsumptionPdf(
+        principal: Principal,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
+        @RequestParam(required = false) groupId: Int?,
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
     ): ResponseEntity<ByteArray> {
-        val pdf = reportsPdfService.generatePdf(startDate, endDate)
+        val pdf = reportsPdfService.generateConsumptionPdf(
+            currentLogin = principal.name,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRole
+        )
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=report_${startDate}_${endDate}.pdf")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=consumption_${startDate}_${endDate}.pdf")
             .contentType(MediaType.APPLICATION_PDF)
             .body(pdf)
     }

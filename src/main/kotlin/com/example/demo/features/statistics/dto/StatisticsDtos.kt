@@ -6,8 +6,5 @@ data class StudentMealStatus(
     val studentId: UUID,
     val fullName: String,
     val hadBreakfast: Boolean,
-    val hadLunch: Boolean,
-    val hadDinner: Boolean,
-    val hadSnack: Boolean,
-    val hadSpecial: Boolean
+    val hadLunch: Boolean
 )

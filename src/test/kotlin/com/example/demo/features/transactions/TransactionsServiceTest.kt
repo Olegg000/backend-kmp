@@ -3,6 +3,7 @@ package com.example.demo.features.transactions
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.UserEntity
@@ -57,7 +58,7 @@ class TransactionsServiceTest {
     @BeforeEach
     fun setup() {
         // Создаем тестовую группу
-        group = groupRepository.save(GroupEntity(groupName = "Test Group", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "Test Group"))
 
         // Создаем куратора
         curator = userRepository.save(
@@ -72,7 +73,7 @@ class TransactionsServiceTest {
             )
         )
 
-        group.curator = curator
+        group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
         // Создаем студента
@@ -107,11 +108,8 @@ class TransactionsServiceTest {
                 student = student,
                 assignedBy = curator,
                 reason = "Тестовое разрешение",
-                isBreakfastAllowed = true,
+                isBreakfastAllowed = false,
                 isLunchAllowed = true,
-                isDinnerAllowed = true,
-                isSnackAllowed = true,
-                isSpecialAllowed = false
             )
         )
     }
@@ -209,12 +207,12 @@ class TransactionsServiceTest {
     @Test
     @DisplayName("Отклонение транзакции без разрешения в табеле")
     fun `syncBatch should reject transaction without permission`() {
-        // Given - студент без разрешения на полдник
+        // Given - студент без разрешения на завтрак
         val items = listOf(
             TransactionSyncItem(
                 studentId = student.id!!,
                 timestamp = LocalDateTime.now(),
-                mealType = MealType.SPECIAL, // Нет разрешения на спец.питание
+                mealType = MealType.BREAKFAST,
                 transactionHash = UUID.randomUUID().toString()
             )
         )
@@ -285,9 +283,6 @@ class TransactionsServiceTest {
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = true,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
 
@@ -332,5 +327,47 @@ class TransactionsServiceTest {
         // Then
         assertEquals(1, response.successCount, "Первый студент должен пройти")
         assertEquals(1, response.errors.size, "Второй должен быть отклонен")
+    }
+
+    @Test
+    @DisplayName("MANY_CHILDREN не может получить второй прием пищи в тот же день")
+    fun `many children student cannot consume two meals in one day`() {
+        student.studentCategory = StudentCategory.MANY_CHILDREN
+        userRepository.save(student)
+
+        // Разрешаем оба приема на день, ограничение должно сработать на уровне транзакций.
+        val permission = permissionRepository.findByStudentAndDate(student, LocalDate.now())!!
+        permission.isBreakfastAllowed = true
+        permission.isLunchAllowed = true
+        permissionRepository.save(permission)
+
+        val first = transactionsService.syncBatch(
+            chef.login,
+            listOf(
+                TransactionSyncItem(
+                    studentId = student.id!!,
+                    timestamp = LocalDateTime.now().minusHours(1),
+                    mealType = MealType.BREAKFAST,
+                    transactionHash = "many-children-1"
+                )
+            )
+        )
+        assertEquals(1, first.successCount)
+
+        val second = transactionsService.syncBatch(
+            chef.login,
+            listOf(
+                TransactionSyncItem(
+                    studentId = student.id!!,
+                    timestamp = LocalDateTime.now(),
+                    mealType = MealType.LUNCH,
+                    transactionHash = "many-children-2"
+                )
+            )
+        )
+
+        assertEquals(0, second.successCount)
+        assertEquals(1, second.errors.size)
+        assertTrue(second.errors.first().contains("Многодетные"))
     }
 }

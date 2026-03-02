@@ -1,7 +1,10 @@
 package com.example.demo.features.reports.service
 
-import com.example.demo.features.reports.dto.DailyReportResponse
-import com.lowagie.text.*
+import com.example.demo.features.reports.dto.AssignedByRoleFilter
+import com.lowagie.text.Document
+import com.lowagie.text.Font
+import com.lowagie.text.PageSize
+import com.lowagie.text.Paragraph
 import com.lowagie.text.pdf.PdfPCell
 import com.lowagie.text.pdf.PdfPTable
 import com.lowagie.text.pdf.PdfWriter
@@ -15,58 +18,58 @@ class ReportsPdfService(
     private val reportsService: ReportsService
 ) {
 
-    fun generatePdf(
+    fun generateConsumptionPdf(
+        currentLogin: String,
         startDate: LocalDate,
-        endDate: LocalDate
+        endDate: LocalDate,
+        groupId: Int?,
+        assignedByRoleFilter: AssignedByRoleFilter
     ): ByteArray {
+        val rows = reportsService.generateConsumptionReport(
+            currentLogin = currentLogin,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRoleFilter
+        )
+
         val baos = ByteArrayOutputStream()
         val document = Document(PageSize.A4.rotate())
         PdfWriter.getInstance(document, baos)
         document.open()
 
         val fontHeader = Font(Font.HELVETICA, 14f, Font.BOLD)
-        val fontNormal = Font(Font.HELVETICA, 10f, Font.NORMAL)
+        val fontNormal = Font(Font.HELVETICA, 9f, Font.NORMAL)
 
         document.add(Paragraph("Отчёт по питанию за период $startDate — $endDate", fontHeader))
         document.add(Paragraph(" "))
 
-        val table = PdfPTable(8)
+        val table = PdfPTable(7)
         table.widthPercentage = 100f
-        table.setWidths(floatArrayOf(2f, 2f, 2f, 2f, 2f, 2f, 2f, 2f))
+        table.setWidths(floatArrayOf(1.5f, 1.8f, 2.6f, 1.3f, 1.2f, 1.3f, 1.3f))
 
         fun headerCell(text: String): PdfPCell =
             PdfPCell(Paragraph(text, fontNormal)).apply { backgroundColor = Color.LIGHT_GRAY }
 
         table.addCell(headerCell("Дата"))
+        table.addCell(headerCell("Группа"))
+        table.addCell(headerCell("Студент"))
+        table.addCell(headerCell("Категория"))
+        table.addCell(headerCell("Назначил"))
         table.addCell(headerCell("Завтрак"))
         table.addCell(headerCell("Обед"))
-        table.addCell(headerCell("Ужин"))
-        table.addCell(headerCell("Полдник"))
-        table.addCell(headerCell("Спец.питание"))
-        table.addCell(headerCell("Всего"))
-        table.addCell(headerCell("Оффлайн"))
 
-        var current = startDate
-        while (!current.isAfter(endDate)) {
-            val r: DailyReportResponse = reportsService.generateDailyReport(current)
-            table.addCell(Paragraph(current.toString(), fontNormal))
-            table.addCell(Paragraph(r.breakfastCount.toString(), fontNormal))
-            table.addCell(Paragraph(r.lunchCount.toString(), fontNormal))
-            table.addCell(Paragraph(r.dinnerCount.toString(), fontNormal))
-            table.addCell(Paragraph(r.snackCount.toString(), fontNormal))
-            table.addCell(Paragraph(r.specialCount.toString(), fontNormal))
-            table.addCell(Paragraph(r.totalCount.toString(), fontNormal))
-            table.addCell(Paragraph(r.offlineTransactions.toString(), fontNormal))
-            current = current.plusDays(1)
+        rows.forEach {
+            table.addCell(Paragraph(it.date.toString(), fontNormal))
+            table.addCell(Paragraph(it.groupName, fontNormal))
+            table.addCell(Paragraph(it.studentName, fontNormal))
+            table.addCell(Paragraph(it.category.name, fontNormal))
+            table.addCell(Paragraph(it.assignedByRole.name, fontNormal))
+            table.addCell(Paragraph(if (it.breakfastUsed) "Да" else "Нет", fontNormal))
+            table.addCell(Paragraph(if (it.lunchUsed) "Да" else "Нет", fontNormal))
         }
 
         document.add(table)
-        document.add(Paragraph(" "))
-
-        document.add(Paragraph("Администратор: ____________________", fontNormal))
-        document.add(Paragraph("Повар:        ____________________", fontNormal))
-        document.add(Paragraph("Куратор:      ____________________", fontNormal))
-
         document.close()
         return baos.toByteArray()
     }

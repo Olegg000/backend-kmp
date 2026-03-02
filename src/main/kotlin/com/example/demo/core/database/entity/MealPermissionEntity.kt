@@ -35,13 +35,4 @@ class MealPermissionEntity (
     @Column(name="lunch", nullable = false)
     var isLunchAllowed: Boolean = false,
 
-    @Column(name="dinner", nullable = false)
-    var isDinnerAllowed: Boolean = false,
-
-    @Column(nullable = false)
-    var isSnackAllowed: Boolean = false, // <-- Добавили
-
-    @Column(nullable = false)
-    var isSpecialAllowed: Boolean = false // <-- Добавили
-
 )

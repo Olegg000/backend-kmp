@@ -64,7 +64,7 @@ class QRValidationIntegrationTest {
         privateKey = keys.second
 
         // Создаем группу
-        val group = groupRepository.save(GroupEntity(groupName = "Test Group", curator = null))
+        val group = groupRepository.save(GroupEntity(groupName = "Test Group"))
 
         // Создаем куратора
         curator = userRepository.save(
@@ -102,9 +102,6 @@ class QRValidationIntegrationTest {
                 reason = "Тест",
                 isBreakfastAllowed = true,
                 isLunchAllowed = true,
-                isDinnerAllowed = false,
-                isSnackAllowed = false,
-                isSpecialAllowed = false
             )
         )
         
@@ -206,16 +203,29 @@ class QRValidationIntegrationTest {
     @Test
     @DisplayName("Отклонение при отсутствии разрешения в табеле")
     fun `should reject when no permission in roster`() {
-        // Given - студент пытается поесть ужин (нет разрешения)
+        // Given - убираем разрешение на обед
+        permissionRepository.deleteAll()
+        permissionRepository.save(
+            MealPermissionEntity(
+                date = LocalDate.now(),
+                student = student,
+                assignedBy = curator,
+                reason = "Только завтрак",
+                isBreakfastAllowed = true,
+                isLunchAllowed = false,
+            )
+        )
+
+        // студент пытается получить обед
         val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
         val nonce = CryptoUtils.generateNonce()
 
         val signature = qrCodeService.generateSignature(
-            student.id.toString(), timestamp, MealType.DINNER, nonce, privateKey
+            student.id.toString(), timestamp, MealType.LUNCH, nonce, privateKey
         )
 
         val request = ValidateQRRequest(
-            student.id!!, timestamp, MealType.DINNER, nonce, signature
+            student.id!!, timestamp, MealType.LUNCH, nonce, signature
         )
 
         // When

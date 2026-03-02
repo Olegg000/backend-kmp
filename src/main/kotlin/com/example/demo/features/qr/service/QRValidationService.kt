@@ -4,6 +4,7 @@ import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.database.entity.MealTransactionEntity
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.features.qr.dto.QRValidationError
 import com.example.demo.features.qr.dto.ValidateQRRequest
 import com.example.demo.features.qr.dto.ValidateQRResponse
@@ -64,6 +65,19 @@ class QRValidationService(
             )
         }
 
+        if (student.studentCategory == StudentCategory.MANY_CHILDREN) {
+            val hasAnyMealToday = transactionRepository.findAllByStudentAndTimeStampBetween(
+                student, startOfDay, endOfDay
+            ).isNotEmpty()
+            if (hasAnyMealToday) {
+                return createErrorResponse(
+                    QRValidationError.ALREADY_ATE,
+                    "${student.surname} ${student.name}",
+                    "Категория 'Многодетные' допускает только один прием пищи в день"
+                )
+            }
+        }
+
         // 3. Проверка хеша транзакции (защита от повторной отправки одного и того же QR)
         val txHash = qrCodeService.generateTransactionHash(
             req.userId.toString(), req.timestamp, req.mealType, req.nonce
@@ -81,10 +95,6 @@ class QRValidationService(
         val isAllowed = when (req.mealType) {
             com.example.demo.core.database.MealType.BREAKFAST -> permission?.isBreakfastAllowed == true
             com.example.demo.core.database.MealType.LUNCH -> permission?.isLunchAllowed == true
-            com.example.demo.core.database.MealType.DINNER -> permission?.isDinnerAllowed == true
-            com.example.demo.core.database.MealType.SNACK -> permission?.isSnackAllowed == true
-            com.example.demo.core.database.MealType.SPECIAL -> permission?.isSpecialAllowed == true
-            else -> false
         }
 
         if (!isAllowed) {
@@ -137,7 +147,7 @@ class QRValidationService(
         
         val chefLogin = SecurityContextHolder.getContext().authentication?.name
         val chef = chefLogin?.let { userRepository.findByLogin(it) }
-            ?: throw IllegalStateException("Chef not found")
+            ?: throw IllegalStateException("Повар не найден")
 
         var successCount = 0
         var failedCount = 0
@@ -149,7 +159,7 @@ class QRValidationService(
                 val student = userRepository.findById(java.util.UUID.fromString(tx.userId)).getOrNull()
                 if (student == null) {
                     failedCount++
-                    errors.add(SyncError(tx.userId, "Student not found"))
+                    errors.add(SyncError(tx.userId, "Студент не найден"))
                     return@forEach
                 }
 
@@ -165,7 +175,7 @@ class QRValidationService(
 
                 if (!isSignatureValid) {
                     failedCount++
-                    errors.add(SyncError(tx.userId, "Invalid signature"))
+                    errors.add(SyncError(tx.userId, "Неверная подпись"))
                     return@forEach
                 }
 
@@ -181,10 +191,49 @@ class QRValidationService(
                 }
                 
                 // 4. Сохранение
-                 val timestamp = LocalDateTime.ofInstant(
+                val timestamp = LocalDateTime.ofInstant(
                     Instant.ofEpochSecond(tx.timestamp),
                     ZoneId.systemDefault()
                 )
+                val dateOfMeal = timestamp.toLocalDate()
+                val startOfDay = dateOfMeal.atStartOfDay()
+                val endOfDay = dateOfMeal.atTime(LocalTime.MAX)
+
+                val alreadyAteSameMeal = transactionRepository.existsByStudentAndMealTypeAndTimeStampBetween(
+                    student,
+                    tx.mealType,
+                    startOfDay,
+                    endOfDay
+                )
+                if (alreadyAteSameMeal) {
+                    failedCount++
+                    errors.add(SyncError(tx.userId, "Студент уже получал ${tx.mealType} за эту дату"))
+                    return@forEach
+                }
+
+                if (student.studentCategory == StudentCategory.MANY_CHILDREN) {
+                    val hasAnyMealToday = transactionRepository.findAllByStudentAndTimeStampBetween(
+                        student,
+                        startOfDay,
+                        endOfDay
+                    ).isNotEmpty()
+                    if (hasAnyMealToday) {
+                        failedCount++
+                        errors.add(SyncError(tx.userId, "Категория 'Многодетные' допускает только один прием пищи в день"))
+                        return@forEach
+                    }
+                }
+
+                val permission = permissionRepository.findByStudentAndDate(student, dateOfMeal)
+                val isAllowed = when (tx.mealType) {
+                    com.example.demo.core.database.MealType.BREAKFAST -> permission?.isBreakfastAllowed == true
+                    com.example.demo.core.database.MealType.LUNCH -> permission?.isLunchAllowed == true
+                }
+                if (!isAllowed) {
+                    failedCount++
+                    errors.add(SyncError(tx.userId, "Нет разрешения в табеле на ${tx.mealType}"))
+                    return@forEach
+                }
                 
                 transactionRepository.save(
                     MealTransactionEntity(
@@ -201,7 +250,7 @@ class QRValidationService(
             } catch (e: Exception) {
                 logger.error("Error syncing transaction for user ${tx.userId}", e)
                 failedCount++
-                errors.add(SyncError(tx.userId, "Internal error: ${e.message}"))
+                errors.add(SyncError(tx.userId, "Внутренняя ошибка: ${e.message}"))
             }
         }
 

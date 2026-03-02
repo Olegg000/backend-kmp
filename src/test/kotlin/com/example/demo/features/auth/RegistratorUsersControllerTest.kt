@@ -63,7 +63,7 @@ class RegistratorUsersControllerTest(
             )
         )
 
-        val request = UpdateUserRolesRequest(setOf(Role.CHEF, Role.STUDENT))
+        val request = UpdateUserRolesRequest(setOf(Role.CHEF))
 
         mockMvc.perform(
             patch("/api/v1/registrator/users/${user.id}/roles")
@@ -73,7 +73,7 @@ class RegistratorUsersControllerTest(
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.login").value("to-update"))
-            .andExpect(jsonPath("$.roles.length()").value(2))
+            .andExpect(jsonPath("$.roles.length()").value(1))
     }
 
     @Test

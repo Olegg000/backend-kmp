@@ -32,7 +32,7 @@ class GroupServiceTest(
 
     @BeforeEach
     fun setup() {
-        group = groupRepository.save(GroupEntity(groupName = "ПИ-21", curator = null))
+        group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
     }
 
     @Test
@@ -49,9 +49,9 @@ class GroupServiceTest(
             )
         )
 
-        val resp = groupService.setCurator(group.id!!, curator.id!!)
+        val resp = groupService.addCurator(group.id!!, curator.id!!)
 
-        assertEquals(curator.id, resp.curatorId)
+        assertTrue(resp.curators.any { it.id == curator.id })
     }
 
     @Test
@@ -68,9 +68,9 @@ class GroupServiceTest(
             )
         )
 
-        val resp = groupService.setCurator(group.id!!, curator.id!!)
+        val resp = groupService.addCurator(group.id!!, curator.id!!)
 
-        assertEquals(curator.id, resp.curatorId)
+        assertTrue(resp.curators.any { it.id == curator.id })
     }
 
     @Test
@@ -88,7 +88,7 @@ class GroupServiceTest(
         )
 
         val ex = assertThrows(RuntimeException::class.java) {
-            groupService.setCurator(group.id!!, notCurator.id!!)
+            groupService.addCurator(group.id!!, notCurator.id!!)
         }
         assertTrue(ex.message!!.contains("не имеет роли CURATOR"))
     }
