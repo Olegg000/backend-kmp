@@ -7,9 +7,9 @@ import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.groups.dto.CuratorSummary
 import com.example.demo.features.groups.dto.CreateGroupRequest
 import com.example.demo.features.groups.dto.GroupResponse
-import jakarta.transaction.Transactional
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
@@ -19,13 +19,15 @@ class GroupService(
 ) {
 
     // 1. Получить все группы (для списка в админке)
+    @Transactional(readOnly = true)
     fun getAllGroups(): List<GroupResponse> {
-        return groupRepository.findAll().map { group ->
+        return groupRepository.findAllWithCurators().map { group ->
             toGroupResponse(group)
         }
     }
 
     // 2. Создать группу
+    @Transactional
     fun createGroup(req: CreateGroupRequest): GroupResponse {
         if (groupRepository.existsByGroupName(req.name)) {
             throw RuntimeException("Группа с таким названием уже существует")

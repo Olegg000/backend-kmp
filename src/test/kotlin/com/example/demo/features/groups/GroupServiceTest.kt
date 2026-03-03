@@ -6,6 +6,7 @@ import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.features.groups.dto.CreateGroupRequest
 import com.example.demo.features.groups.service.GroupService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -15,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
-import java.util.UUID
 
 @DataJpaTest
 @Import(GroupService::class)
@@ -33,6 +33,39 @@ class GroupServiceTest(
     @BeforeEach
     fun setup() {
         group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
+    }
+
+    @Test
+    @DisplayName("Создание группы возвращает пустых кураторов и нулевой счетчик студентов")
+    fun `createGroup should return empty curators and zero student count`() {
+        val created = groupService.createGroup(CreateGroupRequest(name = "ПИ-99"))
+
+        assertEquals("ПИ-99", created.name)
+        assertTrue(created.curators.isEmpty())
+        assertEquals(0, created.studentCount)
+    }
+
+    @Test
+    @DisplayName("Получение всех групп возвращает кураторов в ответе")
+    fun `getAllGroups should include curators`() {
+        val curator = userRepository.save(
+            UserEntity(
+                login = "cur-all-groups",
+                passwordHash = "h",
+                roles = mutableSetOf(Role.CURATOR),
+                name = "Петр",
+                surname = "Петров",
+                fatherName = "Петрович"
+            )
+        )
+        group.curators = mutableSetOf(curator)
+        groupRepository.save(group)
+
+        val groups = groupService.getAllGroups()
+        val target = groups.first { it.id == group.id }
+
+        assertTrue(target.curators.isNotEmpty())
+        assertTrue(target.curators.any { it.id == curator.id })
     }
 
     @Test

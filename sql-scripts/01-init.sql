@@ -44,13 +44,10 @@ INSERT INTO public.user_roles (user_id, role) VALUES
 WITH new_students AS (
     INSERT INTO public.users (id, login, password_hash, name, surname, father_name, group_id, student_category) VALUES
     (gen_random_uuid(), 'stud_Group-101_2', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Дмитрий', 'Соколов', 'Павлович', 1, 'SVO'),
-    (gen_random_uuid(), 'stud_Group-101_3', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Екатерина', 'Попова', 'Андреевна', 1, 'MANY_CHILDREN'),
-    (gen_random_uuid(), 'stud_Group-101_4', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Максим', 'Лебедев', 'Игоревич', 1, 'SVO'),
-    (gen_random_uuid(), 'stud_Group-101_5', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Анастасия', 'Козлова', 'Дмитриевна', 1, 'MANY_CHILDREN'),
-    (gen_random_uuid(), 'stud_Group-101_6', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Артем', 'Новиков', 'Алексеевич', 1, 'SVO')
     ON CONFLICT (login) DO NOTHING
     RETURNING id
 )
+
 INSERT INTO public.user_roles (user_id, role)
 SELECT id, 'STUDENT' FROM new_students;
 
