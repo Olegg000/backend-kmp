@@ -1,5 +1,6 @@
 package com.example.demo.features.roster.dto
 
+import com.example.demo.core.database.StudentCategory
 import java.time.LocalDate
 import java.util.UUID
 
@@ -7,6 +8,7 @@ import java.util.UUID
 data class StudentRosterRow(
     val studentId: UUID,
     val fullName: String,
+    val studentCategory: StudentCategory?,
     val days: List<DayPermissionDto>
 )
 
