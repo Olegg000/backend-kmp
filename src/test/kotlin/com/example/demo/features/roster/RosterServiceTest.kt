@@ -2,8 +2,10 @@ package com.example.demo.features.roster
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
@@ -74,7 +76,8 @@ class RosterServiceTest {
                 name = "Иван",
                 surname = "Студентов",
                 fatherName = "Учащийся",
-                group = group
+                group = group,
+                studentCategory = StudentCategory.SVO
             )
         )
 
@@ -86,7 +89,8 @@ class RosterServiceTest {
                 name = "Петр",
                 surname = "Обучаемый",
                 fatherName = "Педагогович",
-                group = group
+                group = group,
+                studentCategory = StudentCategory.SVO
             )
         )
     }
@@ -231,5 +235,67 @@ class RosterServiceTest {
         }
 
         assertTrue(exception.message!!.contains("не привязан"))
+    }
+
+    @Test
+    @DisplayName("Назначение питания без категории блокируется с кодом STUDENT_CATEGORY_REQUIRED")
+    fun `updateRoster should fail when student has no category`() {
+        student1.studentCategory = null
+        userRepository.save(student1)
+
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
+        val request = UpdateRosterRequest(
+            studentId = student1.id!!,
+            permissions = listOf(DayPermissionDto(monday, true, false, "Тест"))
+        )
+
+        val ex = assertThrows(BusinessException::class.java) {
+            rosterService.updateRoster(request, curator.login)
+        }
+
+        assertEquals("STUDENT_CATEGORY_REQUIRED", ex.code)
+    }
+
+    @Test
+    @DisplayName("Куратор не может изменять табель студента чужой группы")
+    fun `updateRoster should fail for foreign student`() {
+        val foreignGroup = groupRepository.save(GroupEntity(groupName = "ИСП-22"))
+        val foreignCurator = userRepository.save(
+            UserEntity(
+                login = "curator2",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CURATOR),
+                name = "Ольга",
+                surname = "Вторая",
+                fatherName = "Кураторовна"
+            )
+        )
+        foreignGroup.curators = mutableSetOf(foreignCurator)
+        groupRepository.save(foreignGroup)
+
+        val foreignStudent = userRepository.save(
+            UserEntity(
+                login = "student-foreign",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Сергей",
+                surname = "Чужой",
+                fatherName = "Иванович",
+                group = foreignGroup,
+                studentCategory = StudentCategory.SVO
+            )
+        )
+
+        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
+        val request = UpdateRosterRequest(
+            studentId = foreignStudent.id!!,
+            permissions = listOf(DayPermissionDto(monday, true, false, "Тест"))
+        )
+
+        val ex = assertThrows(RuntimeException::class.java) {
+            rosterService.updateRoster(request, curator.login)
+        }
+
+        assertTrue(ex.message!!.contains("только студентов своих групп"))
     }
 }

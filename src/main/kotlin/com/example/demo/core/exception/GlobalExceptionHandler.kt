@@ -15,6 +15,18 @@ class GlobalExceptionHandler {
 
     private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
 
+    @ExceptionHandler(BusinessException::class)
+    fun handleBusiness(e: BusinessException): ResponseEntity<AppError> {
+        logger.warn("Business exception [{}]: {}", e.code, e.message)
+        return buildError(
+            status = e.status,
+            code = e.code,
+            technicalMessage = e.message ?: e.userMessage,
+            userMessage = e.userMessage,
+            retryable = e.retryable
+        )
+    }
+
     @ExceptionHandler(RuntimeException::class)
     fun handleRuntime(e: RuntimeException): ResponseEntity<AppError> {
         logger.error("Runtime exception", e)
@@ -108,4 +120,3 @@ class GlobalExceptionHandler {
         )
     }
 }
-

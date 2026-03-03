@@ -174,4 +174,27 @@ class CuratorStudentServiceTest(
 
         assertTrue(ex.message!!.contains("только студентов своих групп"))
     }
+
+    @Test
+    @DisplayName("Список студентов куратора поддерживает студентов без категории")
+    fun `list students should include null category`() {
+        userRepository.save(
+            UserEntity(
+                login = "student-no-category",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Сергей",
+                surname = "БезКатегории",
+                fatherName = "Д",
+                group = group1,
+                studentCategory = null
+            )
+        )
+
+        val rows = curatorStudentService.listMyStudents(curator1.login)
+        val row = rows.firstOrNull { it.fullName.contains("БезКатегории") }
+
+        assertTrue(row != null)
+        assertEquals(null, row?.studentCategory)
+    }
 }

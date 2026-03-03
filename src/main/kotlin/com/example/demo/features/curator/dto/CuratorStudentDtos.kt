@@ -20,5 +20,5 @@ data class CuratorStudentRow(
     val fullName: String,
     val groupId: Int,
     val groupName: String,
-    val studentCategory: StudentCategory
+    val studentCategory: StudentCategory?
 )

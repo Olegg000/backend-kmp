@@ -3,6 +3,7 @@ package com.example.demo.features.roster.service
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.MealPermissionEntity
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
@@ -74,6 +75,22 @@ class RosterService(
 
         val assigner = userRepository.findByLogin(assignerLogin)
             ?: throw RuntimeException("Пользователь не найден")
+        if (!assigner.roles.contains(Role.CURATOR)) {
+            throw RuntimeException("Действие доступно только куратору")
+        }
+
+        val assignerId = assigner.id ?: throw RuntimeException("Куратор не имеет идентификатор")
+        val studentGroupId = student.group?.id ?: throw RuntimeException("Студент не привязан к группе")
+        if (!groupRepository.existsByIdAndCuratorId(studentGroupId, assignerId)) {
+            throw RuntimeException("Можно обновлять табель только студентов своих групп")
+        }
+
+        if (student.studentCategory == null) {
+            throw BusinessException(
+                code = "STUDENT_CATEGORY_REQUIRED",
+                userMessage = "Нельзя назначить питание: у студента не указана категория. Перейдите в назначение категории."
+            )
+        }
 
         req.permissions.forEach { dto ->
             val existing = permissionRepository.findByStudentAndDate(student, dto.date)

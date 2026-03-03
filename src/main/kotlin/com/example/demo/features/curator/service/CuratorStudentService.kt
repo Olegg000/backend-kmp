@@ -111,7 +111,6 @@ class CuratorStudentService(
                     groupId = it.group!!.id!!,
                     groupName = it.group!!.groupName,
                     studentCategory = it.studentCategory
-                        ?: throw RuntimeException("У студента ${it.login} отсутствует категория")
                 )
             }
             .sortedWith(compareBy({ it.groupName }, { it.fullName }))

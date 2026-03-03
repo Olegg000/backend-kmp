@@ -8,7 +8,7 @@ ON CONFLICT (group_name) DO NOTHING;
 
 -- 2. Базовые пользователи (пароль у всех: password)
 INSERT INTO public.users (id, login, password_hash, name, surname, father_name, group_id, student_category) VALUES
-('00000000-0000-0000-0000-000000000001', 'admin', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Алексей', 'Админов', 'Иванович', NULL, NULL),
+('00000000-0000-0000-0000-000000000001', 'admin', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Алексей', 'Админов', 'Иванович', NULL, 'SVO'),
 ('00000000-0000-0000-0000-000000000002', 'chef_main', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Виктор', 'Баринов', 'Петрович', NULL, NULL),
 ('00000000-0000-0000-0000-000000000003', 'registrator', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Анна', 'Учетова', 'Сергеевна', NULL, NULL),
 ('00000000-0000-0000-0000-000000000004', 'curator_Group-101', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Мария', 'Классова', 'Владимировна', NULL, NULL),
@@ -43,7 +43,7 @@ INSERT INTO public.user_roles (user_id, role) VALUES
 -- 5. Добавляем студентов
 WITH new_students AS (
     INSERT INTO public.users (id, login, password_hash, name, surname, father_name, group_id, student_category) VALUES
-    (gen_random_uuid(), 'stud_Group-101_2', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Дмитрий', 'Соколов', 'Павлович', 1, 'SVO'),
+    (gen_random_uuid(), 'stud_Group-101_2', '$2a$12$TtcYOKw5.MNmAS4BJTrn5OhMqSWqz6rYsSOPotcv37i41xD0trPKS', 'Дмитрий', 'Соколов', 'Павлович', 1, 'SVO')
     ON CONFLICT (login) DO NOTHING
     RETURNING id
 )
