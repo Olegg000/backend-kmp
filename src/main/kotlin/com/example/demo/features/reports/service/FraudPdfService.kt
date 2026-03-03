@@ -1,6 +1,7 @@
 package com.example.demo.features.reports.service
 
 import com.example.demo.features.reports.dto.SuspiciousTransactionDto
+import com.example.demo.core.database.MealType
 import com.lowagie.text.*
 import com.lowagie.text.pdf.PdfPCell
 import com.lowagie.text.pdf.PdfPTable
@@ -50,13 +51,24 @@ class FraudPdfService(
         table.addCell(headerCell("Статус"))
 
         list.forEach { dto ->
-            val status = if (dto.resolved) "RESOLVED" else "NEW"
+            val status = if (dto.resolved) "Решено" else "Новое"
+            val mealType = when (dto.mealType) {
+                MealType.BREAKFAST -> "Завтрак"
+                MealType.LUNCH -> "Обед"
+            }
+            val reason = when (dto.reason.uppercase()) {
+                "ALREADY_ATE" -> "Повторная попытка питания"
+                "INVALID_SIGNATURE" -> "Неверная подпись QR"
+                "EXPIRED_QR" -> "Просроченный QR-код"
+                "NOT_ALLOWED" -> "Питание не разрешено"
+                else -> dto.reason
+            }
             table.addCell(Paragraph(dto.date.toString(), fontNormal))
-            table.addCell(Paragraph(dto.mealType.toString(), fontNormal))
+            table.addCell(Paragraph(mealType, fontNormal))
             table.addCell(Paragraph(dto.studentName, fontNormal))
             table.addCell(Paragraph(dto.groupName ?: "-", fontNormal))
             table.addCell(Paragraph(dto.chefName ?: "-", fontNormal))
-            table.addCell(Paragraph(dto.reason, fontNormal))
+            table.addCell(Paragraph(reason, fontNormal))
             table.addCell(Paragraph(dto.attemptTimestamp.toString(), fontNormal))
             table.addCell(Paragraph(status, fontNormal))
         }

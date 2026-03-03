@@ -24,6 +24,18 @@ data class AuthReturns(
     val studentCategory: StudentCategory?
 )
 
+data class AuthMeResponse(
+    val userId: UUID,
+    val roles: List<String>,
+    val name: String,
+    val surname: String,
+    val fatherName: String,
+    val groupId: Int?,
+    val studentCategory: StudentCategory?,
+    val publicKey: String,
+    val privateKey: String
+)
+
 data class RegUser (
     val login: String,
     val password: String,

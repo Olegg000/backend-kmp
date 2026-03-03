@@ -52,17 +52,27 @@ class SuspiciousTransactionsService(
         val header = "Дата,Тип питания,Студент,Группа,Повар,Причина,Время попытки,Статус\n"
 
         val rows = list.map { dto ->
-
-            val status = if (dto.resolved) "RESOLVED" else "NEW"
+            val status = if (dto.resolved) "Решено" else "Новое"
             val chef = dto.chefName ?: "-"
             val group = dto.groupName ?: "-"
+            val mealType = when (dto.mealType) {
+                MealType.BREAKFAST -> "Завтрак"
+                MealType.LUNCH -> "Обед"
+            }
+            val reason = when (dto.reason.uppercase()) {
+                "ALREADY_ATE" -> "Повторная попытка питания"
+                "INVALID_SIGNATURE" -> "Неверная подпись QR"
+                "EXPIRED_QR" -> "Просроченный QR-код"
+                "NOT_ALLOWED" -> "Питание не разрешено"
+                else -> dto.reason
+            }
 
             "${dto.date}," +
-                    "${dto.mealType}," +
+                    "$mealType," +
                     "\"${dto.studentName}\"," +
                     "\"$group\"," +
                     "\"$chef\"," +
-                    "\"${dto.reason}\"," +
+                    "\"$reason\"," +
                     "${dto.attemptTimestamp}," +
                     status
         }

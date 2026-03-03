@@ -1,6 +1,8 @@
 package com.example.demo.features.reports.service
 
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
+import com.example.demo.core.database.StudentCategory
+import com.example.demo.features.reports.dto.AssignedByRole
 import com.lowagie.text.Document
 import com.lowagie.text.Font
 import com.lowagie.text.PageSize
@@ -63,8 +65,8 @@ class ReportsPdfService(
             table.addCell(Paragraph(it.date.toString(), fontNormal))
             table.addCell(Paragraph(it.groupName, fontNormal))
             table.addCell(Paragraph(it.studentName, fontNormal))
-            table.addCell(Paragraph(it.category.name, fontNormal))
-            table.addCell(Paragraph(it.assignedByRole.name, fontNormal))
+            table.addCell(Paragraph(studentCategoryTitleRu(it.category), fontNormal))
+            table.addCell(Paragraph(assignedByRoleTitleRu(it.assignedByRole), fontNormal))
             table.addCell(Paragraph(if (it.breakfastUsed) "Да" else "Нет", fontNormal))
             table.addCell(Paragraph(if (it.lunchUsed) "Да" else "Нет", fontNormal))
         }
@@ -72,5 +74,15 @@ class ReportsPdfService(
         document.add(table)
         document.close()
         return baos.toByteArray()
+    }
+
+    private fun studentCategoryTitleRu(category: StudentCategory): String = when (category) {
+        StudentCategory.SVO -> "СВО"
+        StudentCategory.MANY_CHILDREN -> "Многодетные"
+    }
+
+    private fun assignedByRoleTitleRu(role: AssignedByRole): String = when (role) {
+        AssignedByRole.ADMIN -> "Администратор"
+        AssignedByRole.CURATOR -> "Куратор"
     }
 }

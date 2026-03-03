@@ -122,6 +122,27 @@ class UserServiceQ(
         )
     }
 
+    @Transactional(readOnly = true)
+    fun getMyProfile(login: String): com.example.demo.features.auth.dto.AuthMeResponse {
+        val user = userRepository.findByLogin(login)
+            ?: throw RuntimeException("Пользователь не найден")
+
+        val publicKey = user.publicKey ?: throw RuntimeException("Публичный ключ пользователя отсутствует")
+        val privateKey = user.encryptedPrivateKey ?: throw RuntimeException("Приватный ключ пользователя отсутствует")
+
+        return com.example.demo.features.auth.dto.AuthMeResponse(
+            userId = user.id!!,
+            roles = user.roles.map { it.name },
+            name = user.name,
+            surname = user.surname,
+            fatherName = user.fatherName,
+            groupId = user.group?.id,
+            studentCategory = user.studentCategory,
+            publicKey = publicKey,
+            privateKey = privateKey
+        )
+    }
+
 
     fun registerUser(dto: RegistrationDto) {
         // 1. Валидация: занят ли логин?

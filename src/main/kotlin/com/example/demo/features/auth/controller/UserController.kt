@@ -2,10 +2,10 @@ package com.example.demo.features.auth.controller
 
 import com.example.demo.features.auth.dto.Auth
 import com.example.demo.features.auth.dto.AuthReturns
+import com.example.demo.features.auth.dto.AuthMeResponse
 import com.example.demo.features.auth.service.UserServiceQ
-import com.sun.net.httpserver.Request
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
-import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -30,6 +30,14 @@ class UserController(
         val login = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication?.name
             ?: throw RuntimeException("Пользователь не аутентифицирован")
         return userService.getMyKeys(login)
+    }
+
+    @GetMapping("/me")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Получить профиль текущего пользователя")
+    fun getMe(): AuthMeResponse {
+        val login = org.springframework.security.core.context.SecurityContextHolder.getContext().authentication?.name
+            ?: throw RuntimeException("Пользователь не аутентифицирован")
+        return userService.getMyProfile(login)
     }
 
 }
