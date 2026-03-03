@@ -28,6 +28,19 @@ interface MealPermissionRepository : JpaRepository<MealPermissionEntity, Int> {
         @Param("endDate") endDate: LocalDate
     ): List<MealPermissionEntity>
 
+    @Query(
+        """
+        SELECT p FROM MealPermissionEntity p
+        WHERE p.student.group IN :groups
+        AND p.date BETWEEN :startDate AND :endDate
+    """
+    )
+    fun findAllByGroupsAndDateRange(
+        @Param("groups") groups: Collection<GroupEntity>,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): List<MealPermissionEntity>
+
     // Проверка: заполнен ли табель для студента на неделю
     @Query("""
         SELECT COUNT(p) > 0 FROM MealPermissionEntity p 

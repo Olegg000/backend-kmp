@@ -1,6 +1,7 @@
 package com.example.demo.core.database.repository
 
 import com.example.demo.core.database.MealType
+import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.core.database.entity.UserEntity
 import org.springframework.data.jpa.repository.JpaRepository
@@ -8,7 +9,6 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.util.UUID
 
 interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> {
 
@@ -61,5 +61,18 @@ interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> 
     fun findAllByTimeStampBetween(
         start: LocalDateTime,
         end: LocalDateTime
+    ): List<MealTransactionEntity>
+
+    @Query(
+        """
+        SELECT t FROM MealTransactionEntity t
+        WHERE t.student.group IN :groups
+        AND t.timeStamp BETWEEN :start AND :end
+    """
+    )
+    fun findAllByStudentGroupInAndTimeStampBetween(
+        @Param("groups") groups: Collection<GroupEntity>,
+        @Param("start") start: LocalDateTime,
+        @Param("end") end: LocalDateTime
     ): List<MealTransactionEntity>
 }

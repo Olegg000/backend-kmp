@@ -41,14 +41,28 @@ class ReportsPdfService(
         document.open()
 
         val fontHeader = Font(Font.HELVETICA, 14f, Font.BOLD)
-        val fontNormal = Font(Font.HELVETICA, 9f, Font.NORMAL)
+        val fontNormal = Font(Font.HELVETICA, 8f, Font.NORMAL)
 
         document.add(Paragraph("Отчёт по питанию за период $startDate — $endDate", fontHeader))
         document.add(Paragraph(" "))
 
-        val table = PdfPTable(7)
+        val table = PdfPTable(11)
         table.widthPercentage = 100f
-        table.setWidths(floatArrayOf(1.5f, 1.8f, 2.6f, 1.3f, 1.2f, 1.3f, 1.3f))
+        table.setWidths(
+            floatArrayOf(
+                1.25f, // Дата
+                1.45f, // Группа
+                2.15f, // Студент
+                1.1f, // Категория
+                2.1f, // Назначил
+                0.95f, // Завтрак
+                1.0f, // Tx завтрак
+                2.0f, // Сканировал завтрак
+                0.95f, // Обед
+                1.0f, // Tx обед
+                2.0f // Сканировал обед
+            )
+        )
 
         fun headerCell(text: String): PdfPCell =
             PdfPCell(Paragraph(text, fontNormal)).apply { backgroundColor = Color.LIGHT_GRAY }
@@ -59,16 +73,32 @@ class ReportsPdfService(
         table.addCell(headerCell("Категория"))
         table.addCell(headerCell("Назначил"))
         table.addCell(headerCell("Завтрак"))
+        table.addCell(headerCell("TX завтрак"))
+        table.addCell(headerCell("Скан. завтрак"))
         table.addCell(headerCell("Обед"))
+        table.addCell(headerCell("TX обед"))
+        table.addCell(headerCell("Скан. обед"))
 
         rows.forEach {
             table.addCell(Paragraph(it.date.toString(), fontNormal))
             table.addCell(Paragraph(it.groupName, fontNormal))
             table.addCell(Paragraph(it.studentName, fontNormal))
             table.addCell(Paragraph(studentCategoryTitleRu(it.category), fontNormal))
-            table.addCell(Paragraph(assignedByRoleTitleRu(it.assignedByRole), fontNormal))
+            table.addCell(
+                Paragraph(
+                    buildAssignedByLabel(
+                        role = it.assignedByRole,
+                        assignedByName = it.assignedByName
+                    ),
+                    fontNormal
+                )
+            )
             table.addCell(Paragraph(if (it.breakfastUsed) "Да" else "Нет", fontNormal))
+            table.addCell(Paragraph(it.breakfastTransactionId?.toString() ?: "-", fontNormal))
+            table.addCell(Paragraph(it.breakfastScannedByName ?: "-", fontNormal))
             table.addCell(Paragraph(if (it.lunchUsed) "Да" else "Нет", fontNormal))
+            table.addCell(Paragraph(it.lunchTransactionId?.toString() ?: "-", fontNormal))
+            table.addCell(Paragraph(it.lunchScannedByName ?: "-", fontNormal))
         }
 
         document.add(table)
@@ -76,13 +106,25 @@ class ReportsPdfService(
         return baos.toByteArray()
     }
 
-    private fun studentCategoryTitleRu(category: StudentCategory): String = when (category) {
+    private fun studentCategoryTitleRu(category: StudentCategory?): String = when (category) {
+        null -> "-"
         StudentCategory.SVO -> "СВО"
         StudentCategory.MANY_CHILDREN -> "Многодетные"
     }
 
-    private fun assignedByRoleTitleRu(role: AssignedByRole): String = when (role) {
+    private fun assignedByRoleTitleRu(role: AssignedByRole?): String = when (role) {
+        null -> "-"
         AssignedByRole.ADMIN -> "Администратор"
         AssignedByRole.CURATOR -> "Куратор"
+    }
+
+    private fun buildAssignedByLabel(role: AssignedByRole?, assignedByName: String?): String {
+        val roleLabel = assignedByRoleTitleRu(role)
+        return when {
+            role == null && assignedByName.isNullOrBlank() -> "Не назначено"
+            assignedByName.isNullOrBlank() -> roleLabel
+            role == null -> assignedByName
+            else -> "$roleLabel • $assignedByName"
+        }
     }
 }

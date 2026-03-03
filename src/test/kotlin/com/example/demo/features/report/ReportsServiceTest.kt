@@ -45,6 +45,7 @@ class ReportsServiceTest(
     private lateinit var group1: GroupEntity
     private lateinit var group2: GroupEntity
     private lateinit var studentG1: UserEntity
+    private lateinit var studentG1NoPermission: UserEntity
     private lateinit var studentG2: UserEntity
 
     @BeforeEach
@@ -114,6 +115,19 @@ class ReportsServiceTest(
             )
         )
 
+        studentG1NoPermission = userRepository.save(
+            UserEntity(
+                login = "student-g1-no-perm",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Анна",
+                surname = "Третья",
+                fatherName = "А",
+                group = group1,
+                studentCategory = StudentCategory.SVO
+            )
+        )
+
         val today = LocalDate.now()
         permissionRepository.save(
             MealPermissionEntity(
@@ -171,7 +185,7 @@ class ReportsServiceTest(
             assignedByRoleFilter = AssignedByRoleFilter.ALL
         )
 
-        assertEquals(2, rows.size)
+        assertEquals(3, rows.size)
         assertTrue(rows.any { it.groupId == group1.id })
         assertTrue(rows.any { it.groupId == group2.id })
     }
@@ -189,9 +203,10 @@ class ReportsServiceTest(
             assignedByRoleFilter = AssignedByRoleFilter.ALL
         )
 
-        assertEquals(1, rows.size)
-        assertEquals(group1.id, rows.first().groupId)
-        assertEquals(studentG1.id, rows.first().studentId)
+        assertEquals(2, rows.size)
+        assertTrue(rows.all { it.groupId == group1.id })
+        assertTrue(rows.any { it.studentId == studentG1.id })
+        assertTrue(rows.any { it.studentId == studentG1NoPermission.id })
     }
 
     @Test
@@ -213,7 +228,36 @@ class ReportsServiceTest(
     }
 
     @Test
-    @DisplayName("CSV экспорт содержит заголовок и обе строки")
+    @DisplayName("Отчет включает студента без табеля и показывает данные сканирования")
+    fun `report should include students without permission and scanner info`() {
+        val today = LocalDate.now()
+
+        val rows = reportsService.generateConsumptionReport(
+            currentLogin = admin.login,
+            startDate = today,
+            endDate = today,
+            groupId = null,
+            assignedByRoleFilter = AssignedByRoleFilter.ALL
+        )
+
+        val noPermissionRow = rows.first { it.studentId == studentG1NoPermission.id }
+        assertEquals(false, noPermissionRow.breakfastUsed)
+        assertEquals(false, noPermissionRow.lunchUsed)
+        assertEquals(null, noPermissionRow.assignedByRole)
+        assertEquals(null, noPermissionRow.assignedByName)
+        assertEquals(null, noPermissionRow.breakfastTransactionId)
+        assertEquals(null, noPermissionRow.lunchTransactionId)
+
+        val g1Row = rows.first { it.studentId == studentG1.id }
+        assertEquals(AssignedByRole.CURATOR, g1Row.assignedByRole)
+        assertEquals("Классова Мария Б", g1Row.assignedByName)
+        assertTrue(g1Row.breakfastUsed)
+        assertTrue(g1Row.breakfastTransactionId != null)
+        assertEquals("Кухонный Повар В", g1Row.breakfastScannedByName)
+    }
+
+    @Test
+    @DisplayName("CSV экспорт содержит расширенный заголовок и строки")
     fun `exportToCsv should include header and data rows`() {
         val today = LocalDate.now()
 
@@ -225,7 +269,9 @@ class ReportsServiceTest(
             assignedByRoleFilter = AssignedByRoleFilter.ALL
         )
 
-        assertTrue(csv.startsWith("Дата,ID группы,Группа,Студент,Категория,Назначил,Завтрак использован,Обед использован"))
+        assertTrue(csv.startsWith("Дата,ID группы,Группа,ID студента,Студент,Категория,Роль назначившего,ФИО назначившего"))
+        assertTrue(csv.contains("ID транзакции завтрака"))
+        assertTrue(csv.contains("ФИО сканировавшего обед"))
         assertTrue(csv.contains("ИСП-21"))
         assertTrue(csv.contains("ИСП-22"))
     }
