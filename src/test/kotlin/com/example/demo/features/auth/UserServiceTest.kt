@@ -230,8 +230,8 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Смена роли на STUDENT без группы и категории допускается")
-    fun `updateUserRoles should allow student without group and category`() {
+    @DisplayName("Смена роли на STUDENT без группы отклоняется")
+    fun `updateUserRoles should reject student role without group`() {
         // Given
         val user = userRepository.save(
             UserEntity(
@@ -246,11 +246,64 @@ class UserServiceTest {
             )
         )
 
+        // When & Then
+        val ex = assertThrows(RuntimeException::class.java) {
+            userService.updateUserRoles(user.id!!, setOf(Role.STUDENT), null)
+        }
+        assertTrue(ex.message!!.contains("нужно выбрать группу"))
+    }
+
+    @Test
+    @DisplayName("Смена роли на STUDENT с группой сохраняет привязку")
+    fun `updateUserRoles should assign group when student role is added`() {
+        // Given
+        val group = groupRepository.save(GroupEntity(groupName = "ТЕСТ-42"))
+        val user = userRepository.save(
+            UserEntity(
+                login = "role-update-with-group",
+                passwordHash = passwordEncoder.encode("pass"),
+                roles = mutableSetOf(Role.CHEF),
+                name = "Тест",
+                surname = "Ролевой",
+                fatherName = "Тестович",
+                group = null,
+                studentCategory = null
+            )
+        )
+
         // When
-        val updated = userService.updateUserRoles(user.id!!, setOf(Role.STUDENT))
+        val updated = userService.updateUserRoles(user.id!!, setOf(Role.STUDENT), group.id)
 
         // Then
         assertTrue(updated.roles.contains(Role.STUDENT))
+        assertEquals(group.id, updated.groupId)
+        assertNull(updated.studentCategory)
+    }
+
+    @Test
+    @DisplayName("Удаление роли STUDENT очищает группу и категорию")
+    fun `updateUserRoles should clear group and category when student role removed`() {
+        // Given
+        val group = groupRepository.save(GroupEntity(groupName = "ПИ-31"))
+        val user = userRepository.save(
+            UserEntity(
+                login = "student-remove-role",
+                passwordHash = passwordEncoder.encode("pass"),
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Иван",
+                surname = "Студентов",
+                fatherName = "Тестович",
+                group = group,
+                studentCategory = StudentCategory.SVO
+            )
+        )
+
+        // When
+        val updated = userService.updateUserRoles(user.id!!, setOf(Role.CHEF), null)
+
+        // Then
+        assertTrue(updated.roles.contains(Role.CHEF))
+        assertFalse(updated.roles.contains(Role.STUDENT))
         assertNull(updated.groupId)
         assertNull(updated.studentCategory)
     }

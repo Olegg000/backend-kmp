@@ -2,7 +2,9 @@ package com.example.demo.features.auth
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
+import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
 import com.example.demo.features.auth.dto.UpdateUserRolesRequest
@@ -29,6 +31,7 @@ class RegistratorUsersControllerTest(
 
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val userRepository: UserRepository,
+    @Autowired private val groupRepository: GroupRepository,
     @Autowired private val jwtUtils: JwtUtils,
     @Autowired private val objectMapper: ObjectMapper
 ) {
@@ -101,6 +104,59 @@ class RegistratorUsersControllerTest(
                 .content(objectMapper.writeValueAsString(request))
         )
             .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    @DisplayName("PATCH roles: при добавлении STUDENT без groupId возвращает 400")
+    fun `patch roles add student without group returns 400`() {
+        val token = createAdminToken()
+        val user = userRepository.save(
+            UserEntity(
+                login = "to-student-no-group",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CHEF),
+                name = "Иван",
+                surname = "БезГруппы",
+                fatherName = "Тестович"
+            )
+        )
+        val request = UpdateUserRolesRequest(roles = setOf(Role.STUDENT), groupId = null)
+
+        mockMvc.perform(
+            patch("/api/v1/registrator/users/${user.id}/roles")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    @DisplayName("PATCH roles: при добавлении STUDENT с groupId сохраняет группу")
+    fun `patch roles add student with group returns 200`() {
+        val token = createAdminToken()
+        val group = groupRepository.save(GroupEntity(groupName = "КН-11"))
+        val user = userRepository.save(
+            UserEntity(
+                login = "to-student-with-group",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CHEF),
+                name = "Иван",
+                surname = "СГруппой",
+                fatherName = "Тестович"
+            )
+        )
+        val request = UpdateUserRolesRequest(roles = setOf(Role.STUDENT), groupId = group.id)
+
+        mockMvc.perform(
+            patch("/api/v1/registrator/users/${user.id}/roles")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.roles.length()").value(1))
+            .andExpect(jsonPath("$.groupId").value(group.id))
     }
 
     @Test

@@ -69,7 +69,7 @@ class RegistratorController(
         @PathVariable userId: UUID,
         @RequestBody request: UpdateUserRolesRequest
     ): AdminUserDto {
-        return userService.updateUserRoles(userId, request.roles)
+        return userService.updateUserRoles(userId, request.roles, request.groupId)
     }
 
     @DeleteMapping("/users/{userId}")

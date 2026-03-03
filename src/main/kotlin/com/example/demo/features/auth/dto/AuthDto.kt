@@ -46,7 +46,8 @@ data class RegUser (
 )
 
 data class UpdateUserRolesRequest(
-    val roles: Set<Role>
+    val roles: Set<Role>,
+    val groupId: Int? = null,
 )
 
 data class AdminUserDto(
