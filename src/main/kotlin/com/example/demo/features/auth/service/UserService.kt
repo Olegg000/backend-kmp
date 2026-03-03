@@ -156,7 +156,7 @@ class UserServiceQ(
             groupEntity = groupRepository.findById(dto.groupId)
                 .orElseThrow { RuntimeException("Группа не найдена") }
         }
-        validateStudentFields(dto.roles, dto.groupId, dto.studentCategory)
+        validateStudentFields(dto.roles, dto.studentCategory)
 
         // 3. Создание сущности
         val user = UserEntity(
@@ -191,14 +191,13 @@ class UserServiceQ(
         val surnameSlug = transliterationUtils.transliterate(req.surname)
         val login = "$loginPrefix-$surnameSlug-${passwordGenerator.generatePassword(3).lowercase()}"
 
-        // 3. Проверка группы
+        // 3. Проверка группы (если указана)
         var groupEntity: GroupEntity? = null
-        if (req.roles.contains(Role.STUDENT)) {
-            if (req.groupId == null) throw RuntimeException("Студенту нужна группа!")
+        if (req.groupId != null) {
             groupEntity = groupRepository.findByIdOrNull(req.groupId)
                 ?: throw RuntimeException("Группа не найдена")
         }
-        validateStudentFields(req.roles, req.groupId, req.studentCategory)
+        validateStudentFields(req.roles, req.studentCategory)
 
         // 4. Создаем Entity с сетом ролей
         val user = UserEntity(
@@ -306,9 +305,6 @@ class UserServiceQ(
         if (!newRoles.contains(Role.STUDENT)) {
             user.studentCategory = null
             user.group = null
-        } else {
-            if (user.group == null) throw RuntimeException("Студент должен быть привязан к группе")
-            if (user.studentCategory == null) throw RuntimeException("Студенту требуется категория")
         }
         val saved = userRepository.save(user)
 
@@ -394,12 +390,10 @@ class UserServiceQ(
 
     private fun validateStudentFields(
         roles: Set<Role>,
-        groupId: Int?,
         category: StudentCategory?
     ) {
-        if (!roles.contains(Role.STUDENT)) return
-        if (groupId == null) throw RuntimeException("Студенту нужна группа")
-        if (category == null) throw RuntimeException("Студенту нужна категория")
+        if (roles.contains(Role.STUDENT)) return
+        if (category != null) throw RuntimeException("Категорию можно задавать только студенту")
     }
 
 }

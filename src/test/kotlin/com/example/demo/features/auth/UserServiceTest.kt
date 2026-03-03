@@ -153,7 +153,7 @@ class UserServiceTest {
     @DisplayName("Авторизация генерирует ключи при первом входе")
     fun `auth should generate keys on first login`() {
         // Given
-        val user = userRepository.save(
+        userRepository.save(
             UserEntity(
                 login = "new-login",
                 passwordHash = passwordEncoder.encode("pass"),
@@ -191,7 +191,7 @@ class UserServiceTest {
             name = "Петр",
             surname = "Петров",
             fatherName = "Петрович",
-            groupId = group.id,   // студенту обязательна группа
+            groupId = group.id,
             studentCategory = StudentCategory.MANY_CHILDREN
         )
 
@@ -207,23 +207,52 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Создание студента требует указания группы")
-    fun `createUserAuto should require group for students`() {
+    @DisplayName("Создание студента без группы и категории допускается")
+    fun `createUserAuto should allow student without group and category`() {
         // Given
         val request = CreateUserRequest(
             roles = mutableSetOf(Role.STUDENT),
             name = "Test",
             surname = "Test",
             fatherName = "Test",
-            groupId = null, // Группа не указана!
-            studentCategory = StudentCategory.MANY_CHILDREN
+            groupId = null,
+            studentCategory = null
         )
 
-        // When & Then
-        val exception = assertThrows(RuntimeException::class.java) {
-            userService.createUserAuto(request)
-        }
-        assertTrue(exception.message!!.contains("нужна группа"))
+        // When
+        val response = userService.createUserAuto(request)
+
+        // Then
+        val created = userRepository.findById(response.userId).orElseThrow()
+        assertTrue(created.roles.contains(Role.STUDENT))
+        assertNull(created.group)
+        assertNull(created.studentCategory)
+    }
+
+    @Test
+    @DisplayName("Смена роли на STUDENT без группы и категории допускается")
+    fun `updateUserRoles should allow student without group and category`() {
+        // Given
+        val user = userRepository.save(
+            UserEntity(
+                login = "role-update-test",
+                passwordHash = passwordEncoder.encode("pass"),
+                roles = mutableSetOf(Role.CHEF),
+                name = "Тест",
+                surname = "Ролевой",
+                fatherName = "Тестович",
+                group = null,
+                studentCategory = null
+            )
+        )
+
+        // When
+        val updated = userService.updateUserRoles(user.id!!, setOf(Role.STUDENT))
+
+        // Then
+        assertTrue(updated.roles.contains(Role.STUDENT))
+        assertNull(updated.groupId)
+        assertNull(updated.studentCategory)
     }
 
     @Test

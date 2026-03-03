@@ -4,11 +4,7 @@ import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
-import com.example.demo.core.util.PasswordGenerator
-import com.example.demo.core.util.TransliterationUtils
 import com.example.demo.features.auth.dto.AdminUserDto
-import com.example.demo.features.auth.dto.UserCredentialsResponse
-import com.example.demo.features.curator.dto.CuratorCreateStudentRequest
 import com.example.demo.features.curator.dto.CuratorStudentRow
 import com.example.demo.features.curator.dto.CuratorStudentCategoryUpdateRequest
 import org.springframework.stereotype.Service
@@ -19,45 +15,7 @@ import java.util.UUID
 class CuratorStudentService(
     private val userRepository: UserRepository,
     private val groupRepository: GroupRepository,
-    private val passwordGenerator: PasswordGenerator,
-    private val transliterationUtils: TransliterationUtils,
-    private val passwordEncoder: org.springframework.security.crypto.password.PasswordEncoder
 ) {
-
-    @Transactional
-    fun createStudent(curatorLogin: String, request: CuratorCreateStudentRequest): UserCredentialsResponse {
-        val curator = requireCurator(curatorLogin)
-        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет идентификатор")
-        if (!groupRepository.existsByIdAndCuratorId(request.groupId, curatorId)) {
-            throw RuntimeException("Можно добавлять студентов только в свои группы")
-        }
-        val group = groupRepository.findById(request.groupId).orElseThrow {
-            RuntimeException("Группа не найдена")
-        }
-
-        val rawPassword = passwordGenerator.generatePassword(8)
-        val login = generateUniqueStudentLogin(request.surname)
-
-        val entity = userRepository.save(
-            UserEntity(
-                login = login,
-                passwordHash = passwordEncoder.encode(rawPassword),
-                roles = mutableSetOf(Role.STUDENT),
-                name = request.name,
-                surname = request.surname,
-                fatherName = request.fatherName,
-                group = group,
-                studentCategory = request.studentCategory
-            )
-        )
-
-        return UserCredentialsResponse(
-            userId = entity.id!!,
-            login = entity.login,
-            passwordClearText = rawPassword,
-            fullName = "${entity.surname} ${entity.name}"
-        )
-    }
 
     @Transactional
     fun updateStudentCategory(
@@ -123,13 +81,5 @@ class CuratorStudentService(
             throw RuntimeException("Действие доступно только куратору")
         }
         return curator
-    }
-
-    private fun generateUniqueStudentLogin(surname: String): String {
-        val base = transliterationUtils.transliterate(surname).ifBlank { "student" }
-        while (true) {
-            val candidate = "st-$base-${passwordGenerator.generatePassword(3).lowercase()}"
-            if (!userRepository.existsByLogin(candidate)) return candidate
-        }
     }
 }

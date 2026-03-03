@@ -7,9 +7,6 @@ import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
-import com.example.demo.core.util.PasswordGenerator
-import com.example.demo.core.util.TransliterationUtils
-import com.example.demo.features.curator.dto.CuratorCreateStudentRequest
 import com.example.demo.features.curator.dto.CuratorStudentCategoryUpdateRequest
 import com.example.demo.features.curator.service.CuratorStudentService
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -21,18 +18,12 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 
 @DataJpaTest
-@Import(
-    CuratorStudentService::class,
-    PasswordGenerator::class,
-    TransliterationUtils::class,
-    BCryptPasswordEncoder::class
-)
+@Import(CuratorStudentService::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
-@DisplayName("CuratorStudentService - создание студентов и смена категории")
+@DisplayName("CuratorStudentService - смена категории и список")
 class CuratorStudentServiceTest(
     @Autowired private val curatorStudentService: CuratorStudentService,
     @Autowired private val userRepository: UserRepository,
@@ -89,48 +80,6 @@ class CuratorStudentServiceTest(
                 studentCategory = StudentCategory.MANY_CHILDREN
             )
         )
-    }
-
-    @Test
-    @DisplayName("Куратор создает студента в своей группе")
-    fun `curator can create student in own group`() {
-        val response = curatorStudentService.createStudent(
-            curatorLogin = curator1.login,
-            request = CuratorCreateStudentRequest(
-                name = "Иван",
-                surname = "Петров",
-                fatherName = "Иванович",
-                groupId = group1.id!!,
-                studentCategory = StudentCategory.SVO
-            )
-        )
-
-        assertTrue(response.login.startsWith("st-"))
-        assertTrue(response.passwordClearText.length >= 8)
-
-        val created = userRepository.findById(response.userId).orElseThrow()
-        assertEquals(group1.id, created.group?.id)
-        assertEquals(StudentCategory.SVO, created.studentCategory)
-        assertTrue(created.roles.contains(Role.STUDENT))
-    }
-
-    @Test
-    @DisplayName("Куратор не может создать студента в чужой группе")
-    fun `curator cannot create student in foreign group`() {
-        val ex = assertThrows(RuntimeException::class.java) {
-            curatorStudentService.createStudent(
-                curatorLogin = curator1.login,
-                request = CuratorCreateStudentRequest(
-                    name = "Иван",
-                    surname = "Петров",
-                    fatherName = "Иванович",
-                    groupId = group2.id!!,
-                    studentCategory = StudentCategory.SVO
-                )
-            )
-        }
-
-        assertTrue(ex.message!!.contains("только в свои группы"))
     }
 
     @Test

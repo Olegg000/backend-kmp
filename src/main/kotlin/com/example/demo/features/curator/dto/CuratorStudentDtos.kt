@@ -3,14 +3,6 @@ package com.example.demo.features.curator.dto
 import com.example.demo.core.database.StudentCategory
 import java.util.UUID
 
-data class CuratorCreateStudentRequest(
-    val name: String,
-    val surname: String,
-    val fatherName: String,
-    val groupId: Int,
-    val studentCategory: StudentCategory
-)
-
 data class CuratorStudentCategoryUpdateRequest(
     val studentCategory: StudentCategory
 )
