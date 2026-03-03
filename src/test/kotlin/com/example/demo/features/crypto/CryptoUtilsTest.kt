@@ -4,6 +4,11 @@ import com.example.demo.core.util.CryptoUtils
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.security.KeyFactory
+import java.security.interfaces.ECPrivateKey
+import java.security.interfaces.ECPublicKey
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 @DisplayName("CryptoUtils - Утилиты криптографии")
@@ -36,6 +41,28 @@ class CryptoUtilsTest {
         // Then
         assertNotEquals(pair1.first, pair2.first, "Публичные ключи должны отличаться")
         assertNotEquals(pair1.second, pair2.second, "Приватные ключи должны отличаться")
+    }
+
+    @Test
+    @DisplayName("Формат ключей совместим с EC PKCS#8/X.509")
+    fun `generated keys should be EC PKCS8 and X509`() {
+        // Given
+        val (publicKeyBase64, privateKeyBase64) = CryptoUtils.generateKeyPair()
+        val keyFactory = KeyFactory.getInstance("EC")
+
+        // When
+        val privateKey = keyFactory.generatePrivate(
+            PKCS8EncodedKeySpec(Base64.getDecoder().decode(privateKeyBase64))
+        )
+        val publicKey = keyFactory.generatePublic(
+            X509EncodedKeySpec(Base64.getDecoder().decode(publicKeyBase64))
+        )
+
+        // Then
+        assertTrue(privateKey is ECPrivateKey, "Приватный ключ должен быть EC")
+        assertTrue(publicKey is ECPublicKey, "Публичный ключ должен быть EC")
+        assertEquals("PKCS#8", privateKey.format)
+        assertEquals("X.509", publicKey.format)
     }
 
     @Test
