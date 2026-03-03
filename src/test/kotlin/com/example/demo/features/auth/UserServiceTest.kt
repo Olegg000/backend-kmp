@@ -248,14 +248,49 @@ class UserServiceTest {
 
         // When & Then
         val ex = assertThrows(RuntimeException::class.java) {
-            userService.updateUserRoles(user.id!!, setOf(Role.STUDENT), null)
+            userService.updateUserRoles(
+                userId = user.id!!,
+                newRoles = setOf(Role.STUDENT),
+                groupId = null,
+                studentCategory = StudentCategory.SVO,
+            )
         }
         assertTrue(ex.message!!.contains("нужно выбрать группу"))
     }
 
     @Test
-    @DisplayName("Смена роли на STUDENT с группой сохраняет привязку")
-    fun `updateUserRoles should assign group when student role is added`() {
+    @DisplayName("Смена роли на STUDENT без категории отклоняется")
+    fun `updateUserRoles should reject student role without category`() {
+        // Given
+        val group = groupRepository.save(GroupEntity(groupName = "ТЕСТ-43"))
+        val user = userRepository.save(
+            UserEntity(
+                login = "role-update-no-category",
+                passwordHash = passwordEncoder.encode("pass"),
+                roles = mutableSetOf(Role.CHEF),
+                name = "Тест",
+                surname = "БезКатегории",
+                fatherName = "Тестович",
+                group = null,
+                studentCategory = null
+            )
+        )
+
+        // When & Then
+        val ex = assertThrows(RuntimeException::class.java) {
+            userService.updateUserRoles(
+                userId = user.id!!,
+                newRoles = setOf(Role.STUDENT),
+                groupId = group.id,
+                studentCategory = null,
+            )
+        }
+        assertTrue(ex.message!!.contains("нужно выбрать категорию"))
+    }
+
+    @Test
+    @DisplayName("Смена роли на STUDENT с группой и категорией сохраняет привязку")
+    fun `updateUserRoles should assign group and category when student role is added`() {
         // Given
         val group = groupRepository.save(GroupEntity(groupName = "ТЕСТ-42"))
         val user = userRepository.save(
@@ -272,12 +307,17 @@ class UserServiceTest {
         )
 
         // When
-        val updated = userService.updateUserRoles(user.id!!, setOf(Role.STUDENT), group.id)
+        val updated = userService.updateUserRoles(
+            userId = user.id!!,
+            newRoles = setOf(Role.STUDENT),
+            groupId = group.id,
+            studentCategory = StudentCategory.SVO,
+        )
 
         // Then
         assertTrue(updated.roles.contains(Role.STUDENT))
         assertEquals(group.id, updated.groupId)
-        assertNull(updated.studentCategory)
+        assertEquals(StudentCategory.SVO, updated.studentCategory)
     }
 
     @Test

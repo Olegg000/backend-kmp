@@ -2,6 +2,7 @@ package com.example.demo.features.auth
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
@@ -120,7 +121,11 @@ class RegistratorUsersControllerTest(
                 fatherName = "Тестович"
             )
         )
-        val request = UpdateUserRolesRequest(roles = setOf(Role.STUDENT), groupId = null)
+        val request = UpdateUserRolesRequest(
+            roles = setOf(Role.STUDENT),
+            groupId = null,
+            studentCategory = StudentCategory.SVO,
+        )
 
         mockMvc.perform(
             patch("/api/v1/registrator/users/${user.id}/roles")
@@ -132,7 +137,37 @@ class RegistratorUsersControllerTest(
     }
 
     @Test
-    @DisplayName("PATCH roles: при добавлении STUDENT с groupId сохраняет группу")
+    @DisplayName("PATCH roles: при добавлении STUDENT без категории возвращает 400")
+    fun `patch roles add student without category returns 400`() {
+        val token = createAdminToken()
+        val group = groupRepository.save(GroupEntity(groupName = "КН-10"))
+        val user = userRepository.save(
+            UserEntity(
+                login = "to-student-no-category",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CHEF),
+                name = "Иван",
+                surname = "БезКатегории",
+                fatherName = "Тестович"
+            )
+        )
+        val request = UpdateUserRolesRequest(
+            roles = setOf(Role.STUDENT),
+            groupId = group.id,
+            studentCategory = null,
+        )
+
+        mockMvc.perform(
+            patch("/api/v1/registrator/users/${user.id}/roles")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    @DisplayName("PATCH roles: при добавлении STUDENT с groupId и категорией сохраняет привязку")
     fun `patch roles add student with group returns 200`() {
         val token = createAdminToken()
         val group = groupRepository.save(GroupEntity(groupName = "КН-11"))
@@ -146,7 +181,11 @@ class RegistratorUsersControllerTest(
                 fatherName = "Тестович"
             )
         )
-        val request = UpdateUserRolesRequest(roles = setOf(Role.STUDENT), groupId = group.id)
+        val request = UpdateUserRolesRequest(
+            roles = setOf(Role.STUDENT),
+            groupId = group.id,
+            studentCategory = StudentCategory.SVO,
+        )
 
         mockMvc.perform(
             patch("/api/v1/registrator/users/${user.id}/roles")
@@ -157,6 +196,7 @@ class RegistratorUsersControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.roles.length()").value(1))
             .andExpect(jsonPath("$.groupId").value(group.id))
+            .andExpect(jsonPath("$.studentCategory").value("SVO"))
     }
 
     @Test

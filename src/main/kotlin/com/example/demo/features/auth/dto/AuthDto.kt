@@ -48,6 +48,7 @@ data class RegUser (
 data class UpdateUserRolesRequest(
     val roles: Set<Role>,
     val groupId: Int? = null,
+    val studentCategory: StudentCategory? = null,
 )
 
 data class AdminUserDto(

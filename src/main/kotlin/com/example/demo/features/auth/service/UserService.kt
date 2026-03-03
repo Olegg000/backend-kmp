@@ -293,7 +293,12 @@ class UserServiceQ(
     }
 
     @Transactional
-    fun updateUserRoles(userId: UUID, newRoles: Set<Role>, groupId: Int? = null): AdminUserDto {
+    fun updateUserRoles(
+        userId: UUID,
+        newRoles: Set<Role>,
+        groupId: Int? = null,
+        studentCategory: StudentCategory? = null,
+    ): AdminUserDto {
         if (newRoles.isEmpty()) {
             throw RuntimeException("Пользователь должен иметь хотя бы одну роль")
         }
@@ -313,6 +318,12 @@ class UserServiceQ(
                     ?: throw RuntimeException("Группа не найдена")
             } else if (!hadStudentRole) {
                 throw RuntimeException("Для роли STUDENT нужно выбрать группу")
+            }
+            if (!hadStudentRole && studentCategory == null) {
+                throw RuntimeException("Для роли STUDENT нужно выбрать категорию")
+            }
+            if (studentCategory != null) {
+                user.studentCategory = studentCategory
             }
         }
         val saved = userRepository.save(user)
