@@ -10,6 +10,9 @@ interface GroupRepository: JpaRepository<GroupEntity, Int>{
     fun findByGroupName(groupName: String): GroupEntity?
     fun existsByGroupName(groupName: String): Boolean
 
+    @Query("SELECT g.groupName FROM GroupEntity g")
+    fun findAllGroupNames(): List<String>
+
     @Query("SELECT DISTINCT g FROM GroupEntity g LEFT JOIN FETCH g.curators")
     fun findAllWithCurators(): List<GroupEntity>
 

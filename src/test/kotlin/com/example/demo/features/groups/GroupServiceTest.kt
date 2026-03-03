@@ -6,6 +6,7 @@ import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.groups.dto.CreateGroupRequest
 import com.example.demo.features.groups.service.GroupService
 import org.junit.jupiter.api.Assertions.*
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.test.context.ActiveProfiles
 
 @DataJpaTest
@@ -43,6 +45,50 @@ class GroupServiceTest(
         assertEquals("ПИ-99", created.name)
         assertTrue(created.curators.isEmpty())
         assertEquals(0, created.studentCount)
+    }
+
+    @Test
+    @DisplayName("Первая группа в пустой базе создается успешно")
+    fun `create first group in empty database should succeed`() {
+        groupRepository.deleteAll()
+
+        val created = groupService.createGroup(CreateGroupRequest(name = "ПИ-01"))
+
+        assertEquals("ПИ-01", created.name)
+        assertTrue(created.curators.isEmpty())
+        assertEquals(0, created.studentCount)
+    }
+
+    @Test
+    @DisplayName("Имя группы нормализуется: trim и схлопывание пробелов")
+    fun `createGroup should normalize group name`() {
+        val created = groupService.createGroup(CreateGroupRequest(name = "  ПИ   100  "))
+
+        assertEquals("ПИ 100", created.name)
+    }
+
+    @Test
+    @DisplayName("Пустое имя группы после нормализации отклоняется")
+    fun `createGroup should fail when normalized name is blank`() {
+        val ex = assertThrows(BusinessException::class.java) {
+            groupService.createGroup(CreateGroupRequest(name = "    "))
+        }
+
+        assertEquals("GROUP_NAME_REQUIRED", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
+    }
+
+    @Test
+    @DisplayName("Дубликат группы с другим регистром и пробелами отклоняется")
+    fun `createGroup should reject duplicate by normalized case-insensitive name`() {
+        groupService.createGroup(CreateGroupRequest(name = "ПИ 42"))
+
+        val ex = assertThrows(BusinessException::class.java) {
+            groupService.createGroup(CreateGroupRequest(name = "  пи   42  "))
+        }
+
+        assertEquals("GROUP_ALREADY_EXISTS", ex.code)
+        assertEquals(HttpStatus.CONFLICT, ex.status)
     }
 
     @Test

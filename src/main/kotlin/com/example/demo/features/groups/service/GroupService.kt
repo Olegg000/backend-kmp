@@ -4,11 +4,14 @@ import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.groups.dto.CuratorSummary
 import com.example.demo.features.groups.dto.CreateGroupRequest
 import com.example.demo.features.groups.dto.GroupResponse
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
@@ -29,12 +32,32 @@ class GroupService(
     // 2. Создать группу
     @Transactional
     fun createGroup(req: CreateGroupRequest): GroupResponse {
-        if (groupRepository.existsByGroupName(req.name)) {
-            throw RuntimeException("Группа с таким названием уже существует")
+        val normalizedName = normalizeGroupName(req.name)
+        if (normalizedName.isBlank()) {
+            throw BusinessException(
+                code = "GROUP_NAME_REQUIRED",
+                userMessage = "Введите название группы",
+                status = HttpStatus.BAD_REQUEST
+            )
         }
-        val group = GroupEntity(groupName = req.name)
-        val saved = groupRepository.save(group)
-        return toGroupResponse(saved)
+
+        val duplicateExists = groupRepository.findAllGroupNames()
+            .asSequence()
+            .map(::normalizeGroupName)
+            .any { it.equals(normalizedName, ignoreCase = true) }
+
+        if (duplicateExists) {
+            throw groupAlreadyExistsException()
+        }
+
+        return try {
+            val group = GroupEntity(groupName = normalizedName)
+            val saved = groupRepository.save(group)
+            toGroupResponse(saved)
+        } catch (_: DataIntegrityViolationException) {
+            // Защита от гонки: если параллельно создали такую же группу.
+            throw groupAlreadyExistsException()
+        }
     }
 
     // 3. Добавить куратора в группу
@@ -133,6 +156,21 @@ class GroupService(
                     )
                 },
             studentCount = count
+        )
+    }
+
+    private fun normalizeGroupName(raw: String): String {
+        return raw.trim()
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+    }
+
+    private fun groupAlreadyExistsException(): BusinessException {
+        return BusinessException(
+            code = "GROUP_ALREADY_EXISTS",
+            userMessage = "Группа с таким названием уже существует",
+            status = HttpStatus.CONFLICT
         )
     }
 }
