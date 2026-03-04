@@ -1,8 +1,10 @@
 package com.example.demo.core.database.entity
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import jakarta.persistence.*
+import java.time.LocalDateTime
 import java.util.UUID
 
 @Entity
@@ -43,5 +45,19 @@ class UserEntity(
     var publicKey: String? = null,
 
     @Column(columnDefinition = "TEXT")
-    var encryptedPrivateKey: String? = null
+    var encryptedPrivateKey: String? = null,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false)
+    var accountStatus: AccountStatus = AccountStatus.ACTIVE,
+
+    @Column(name = "expelled_at")
+    var expelledAt: LocalDateTime? = null,
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "expelled_by_id")
+    var expelledBy: UserEntity? = null,
+
+    @Column(name = "expel_note", columnDefinition = "TEXT")
+    var expelNote: String? = null
 )

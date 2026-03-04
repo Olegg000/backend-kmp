@@ -3,6 +3,7 @@ package com.example.demo.features.reports.controller
 import com.example.demo.core.logging.maskLogin
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.dto.ConsumptionReportRow
+import com.example.demo.features.reports.dto.ConsumptionSummaryResponse
 import com.example.demo.features.reports.service.ReportsPdfService
 import com.example.demo.features.reports.service.ReportsService
 import io.swagger.v3.oas.annotations.Operation
@@ -87,6 +88,25 @@ class ReportsController(
             )
             throw e
         }
+    }
+
+    @GetMapping("/consumption/summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CURATOR')")
+    @Operation(summary = "Сводный отчет по 3 единицам (завтрак, обед, завтрак+обед)")
+    fun getConsumptionSummary(
+        principal: Principal,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
+        @RequestParam(required = false) groupId: Int?,
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
+    ): ConsumptionSummaryResponse {
+        return reportsService.generateConsumptionSummary(
+            currentLogin = principal.name,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRole
+        )
     }
 
     @GetMapping("/consumption/export/csv")

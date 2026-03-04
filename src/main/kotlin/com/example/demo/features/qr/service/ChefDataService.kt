@@ -1,17 +1,33 @@
 package com.example.demo.features.qr.service
 
+import com.example.demo.core.database.Role
+import com.example.demo.core.database.entity.ChefWeekConfirmationEntity
+import com.example.demo.core.database.repository.ChefWeekConfirmationRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.qr.dto.StudentKeyDto
+import com.example.demo.features.qr.dto.ChefWeeklyReportDayDto
+import com.example.demo.features.qr.dto.ChefWeeklyReportDto
 import com.example.demo.features.qr.dto.StudentPermissionDto
+import com.example.demo.features.roster.service.RosterWeekPolicy
+import com.example.demo.features.roster.service.WeeklyRosterFreezeService
+import com.example.demo.core.database.repository.WeeklyReportSnapshotRepository
+import com.example.demo.core.exception.BusinessException
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import java.time.Clock
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 
 @Service
 class ChefDataService(
     private val userRepository: UserRepository,
     private val permissionRepository: MealPermissionRepository,
+    private val weeklyReportSnapshotRepository: WeeklyReportSnapshotRepository,
+    private val chefWeekConfirmationRepository: ChefWeekConfirmationRepository,
+    private val rosterWeekPolicy: RosterWeekPolicy,
+    private val weeklyRosterFreezeService: WeeklyRosterFreezeService,
     private val businessClock: Clock,
 ) {
 
@@ -51,5 +67,78 @@ class ChefDataService(
                 lunch = perm.isLunchAllowed
             )
         }
+    }
+
+    fun getWeeklyReport(currentLogin: String, weekStart: LocalDate): ChefWeeklyReportDto {
+        val currentUser = userRepository.findByLogin(currentLogin)
+            ?: throw RuntimeException("Пользователь не найден")
+
+        val normalizedWeekStart = weekStart.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        if (normalizedWeekStart != weekStart) {
+            throw BusinessException(
+                code = "WEEK_START_MUST_BE_MONDAY",
+                userMessage = "weekStart должен указывать на понедельник",
+                status = HttpStatus.BAD_REQUEST,
+            )
+        }
+
+        var snapshotRows = weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(normalizedWeekStart)
+        if (snapshotRows.isEmpty() && rosterWeekPolicy.isLockedWeek(normalizedWeekStart)) {
+            weeklyRosterFreezeService.freezeWeek(normalizedWeekStart)
+            snapshotRows = weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(normalizedWeekStart)
+        }
+
+        val days = snapshotRows.map { row ->
+            ChefWeeklyReportDayDto(
+                date = row.date,
+                breakfastCount = row.breakfastCount,
+                lunchCount = row.lunchCount,
+                bothCount = row.bothCount,
+            )
+        }
+        val totalBreakfast = days.sumOf { it.breakfastCount }
+        val totalLunch = days.sumOf { it.lunchCount }
+        val totalBoth = days.sumOf { it.bothCount }
+
+        val confirmation = if (currentUser.roles.contains(Role.CHEF)) {
+            chefWeekConfirmationRepository.findByChefAndWeekStart(currentUser, normalizedWeekStart)
+        } else {
+            null
+        }
+
+        return ChefWeeklyReportDto(
+            weekStart = normalizedWeekStart,
+            days = days,
+            totalBreakfastCount = totalBreakfast,
+            totalLunchCount = totalLunch,
+            totalBothCount = totalBoth,
+            confirmed = confirmation != null,
+            confirmedAt = confirmation?.confirmedAt,
+        )
+    }
+
+    fun confirmWeeklyReport(currentLogin: String, weekStart: LocalDate) {
+        val currentUser = userRepository.findByLogin(currentLogin)
+            ?: throw RuntimeException("Пользователь не найден")
+        if (!currentUser.roles.contains(Role.CHEF)) {
+            throw BusinessException(
+                code = "CHEF_ROLE_REQUIRED",
+                userMessage = "Подтверждение отчета доступно только повару",
+                status = HttpStatus.FORBIDDEN,
+            )
+        }
+
+        val normalizedWeekStart = weekStart.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val existing = chefWeekConfirmationRepository.findByChefAndWeekStart(currentUser, normalizedWeekStart)
+        if (existing != null) {
+            return
+        }
+        chefWeekConfirmationRepository.save(
+            ChefWeekConfirmationEntity(
+                chef = currentUser,
+                weekStart = normalizedWeekStart,
+                confirmedAt = rosterWeekPolicy.now(),
+            )
+        )
     }
 }

@@ -1,13 +1,17 @@
 package com.example.demo.features.report
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.config.TimeConfig
+import com.example.demo.core.database.CuratorWeekFillStatus
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
+import com.example.demo.core.database.entity.CuratorWeekAuditEntity
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.core.database.entity.UserEntity
+import com.example.demo.core.database.repository.CuratorWeekAuditRepository
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
@@ -15,7 +19,9 @@ import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.reports.dto.AssignedByRole
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.service.ReportsService
+import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -28,7 +34,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @DataJpaTest
-@Import(ReportsService::class)
+@Import(ReportsService::class, RosterWeekPolicy::class, TimeConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("ReportsService - Детальный отчет consumption")
 class ReportsServiceTest(
@@ -37,6 +43,7 @@ class ReportsServiceTest(
     @Autowired private val permissionRepository: MealPermissionRepository,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val groupRepository: GroupRepository,
+    @Autowired private val curatorWeekAuditRepository: CuratorWeekAuditRepository,
 ) {
 
     private lateinit var admin: UserEntity
@@ -210,6 +217,23 @@ class ReportsServiceTest(
     }
 
     @Test
+    @DisplayName("CURATOR не может запросить чужую группу по groupId")
+    fun `curator cannot request foreign group`() {
+        val today = LocalDate.now()
+        val ex = assertThrows(RuntimeException::class.java) {
+            reportsService.generateConsumptionReport(
+                currentLogin = curator.login,
+                startDate = today,
+                endDate = today,
+                groupId = group2.id,
+                assignedByRoleFilter = AssignedByRoleFilter.ALL
+            )
+        }
+
+        assertTrue(ex.message!!.contains("Группа недоступна куратору"))
+    }
+
+    @Test
     @DisplayName("Фильтр assignedByRole=ADMIN возвращает только админские назначения")
     fun `assignedByRole filter should work`() {
         val today = LocalDate.now()
@@ -274,5 +298,34 @@ class ReportsServiceTest(
         assertTrue(csv.contains("ФИО сканировавшего обед"))
         assertTrue(csv.contains("ИСП-21"))
         assertTrue(csv.contains("ИСП-22"))
+    }
+
+    @Test
+    @DisplayName("Summary содержит агрегаты 3 единиц и zero-fill кураторов")
+    fun `summary should include aggregates and zero fill curators`() {
+        val today = LocalDate.now()
+        val weekStart = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+        curatorWeekAuditRepository.save(
+            CuratorWeekAuditEntity(
+                curator = curator,
+                weekStart = weekStart,
+                filledCells = 0,
+                expectedCells = 10,
+                fillStatus = CuratorWeekFillStatus.ZERO_FILL,
+                lockedAt = LocalDateTime.now(),
+            )
+        )
+
+        val summary = reportsService.generateConsumptionSummary(
+            currentLogin = admin.login,
+            startDate = today,
+            endDate = today,
+            groupId = null,
+            assignedByRoleFilter = AssignedByRoleFilter.ALL
+        )
+
+        assertTrue(summary.totalBreakfastCount >= 2)
+        assertTrue(summary.totalLunchCount >= 1)
+        assertTrue(summary.zeroFillCurators.any { it.curatorId == curator.id })
     }
 }

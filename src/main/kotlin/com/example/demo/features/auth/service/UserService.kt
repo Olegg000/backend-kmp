@@ -1,5 +1,6 @@
 package com.example.demo.features.auth.service
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
@@ -28,6 +29,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -39,6 +41,7 @@ class UserServiceQ(
     private val passwordEncoder: PasswordEncoder,
     private val groupRepository: GroupRepository,
     private val passwordResetLogRepository: PasswordResetLogRepository,
+    private val businessClock: Clock,
 ) {
     @Autowired
     private lateinit var passwordGenerator: PasswordGenerator
@@ -68,6 +71,15 @@ class UserServiceQ(
 
     @Transactional
     fun auth(request: Auth): AuthReturns {
+        val knownUser = userRepository.findByLogin(request.login)
+        if (knownUser != null && knownUser.accountStatus == AccountStatus.FROZEN_EXPELLED) {
+            throw BusinessException(
+                code = "ACCOUNT_FROZEN_EXPELLED",
+                userMessage = "Аккаунт отчисленного пользователя заблокирован. Обратитесь к регистратору.",
+                status = HttpStatus.FORBIDDEN,
+            )
+        }
+
         // 1. Проверка логина и пароля средствами Spring Security
         authenticationManager.authenticate(
             UsernamePasswordAuthenticationToken(request.login, request.password)
@@ -409,7 +421,8 @@ class UserServiceQ(
             surname = saved.surname,
             fatherName = saved.fatherName,
             groupId = saved.group?.id,
-            studentCategory = saved.studentCategory
+            studentCategory = saved.studentCategory,
+            accountStatus = saved.accountStatus,
         )
     }
 
@@ -436,7 +449,8 @@ class UserServiceQ(
             surname = saved.surname,
             fatherName = saved.fatherName,
             groupId = saved.group?.id,
-            studentCategory = saved.studentCategory
+            studentCategory = saved.studentCategory,
+            accountStatus = saved.accountStatus,
         )
     }
 
@@ -490,9 +504,62 @@ class UserServiceQ(
                 surname = it.surname,
                 fatherName = it.fatherName,
                 groupId = it.group?.id,
-                studentCategory = it.studentCategory
+                studentCategory = it.studentCategory,
+                accountStatus = it.accountStatus,
             )
         }
+    }
+
+    @Transactional
+    fun updateUserLifecycle(
+        userId: UUID,
+        status: AccountStatus,
+        expelNote: String?,
+        requestedByLogin: String,
+    ): AdminUserDto {
+        val actor = userRepository.findByLogin(requestedByLogin)
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
+        val user = userRepository.findByIdOrNull(userId)
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
+        if (user.login == requestedByLogin && status == AccountStatus.FROZEN_EXPELLED) {
+            throw BusinessException(
+                code = "SELF_LIFECYCLE_CHANGE_FORBIDDEN",
+                userMessage = "Нельзя переводить самого себя в отчисленные.",
+                status = HttpStatus.FORBIDDEN,
+            )
+        }
+
+        user.accountStatus = status
+        if (status == AccountStatus.FROZEN_EXPELLED) {
+            user.expelledAt = LocalDateTime.now(businessClock)
+            user.expelledBy = actor
+            user.expelNote = expelNote?.trim()?.ifBlank { null }
+        } else {
+            user.expelledAt = null
+            user.expelledBy = null
+            user.expelNote = null
+        }
+
+        val saved = userRepository.save(user)
+        return AdminUserDto(
+            userId = saved.id!!,
+            login = saved.login,
+            roles = saved.roles.toSet(),
+            name = saved.name,
+            surname = saved.surname,
+            fatherName = saved.fatherName,
+            groupId = saved.group?.id,
+            studentCategory = saved.studentCategory,
+            accountStatus = saved.accountStatus,
+        )
     }
 
     private fun validateStudentFields(

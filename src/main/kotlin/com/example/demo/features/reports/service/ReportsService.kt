@@ -1,10 +1,14 @@
 package com.example.demo.features.reports.service
 
+import com.example.demo.core.database.CuratorWeekFillStatus
 import com.example.demo.core.database.MealType
+import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
+import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.MealTransactionEntity
+import com.example.demo.core.database.repository.CuratorWeekAuditRepository
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
@@ -14,6 +18,10 @@ import com.example.demo.core.logging.maskUuid
 import com.example.demo.features.reports.dto.AssignedByRole
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.dto.ConsumptionReportRow
+import com.example.demo.features.reports.dto.ConsumptionSummaryDay
+import com.example.demo.features.reports.dto.ConsumptionSummaryResponse
+import com.example.demo.features.reports.dto.ZeroFillCuratorSummary
+import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -25,7 +33,9 @@ class ReportsService(
     private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,
     private val permissionRepository: MealPermissionRepository,
-    private val transactionRepository: MealTransactionRepository
+    private val transactionRepository: MealTransactionRepository,
+    private val curatorWeekAuditRepository: CuratorWeekAuditRepository,
+    private val rosterWeekPolicy: RosterWeekPolicy,
 ) {
     private val logger = LoggerFactory.getLogger(ReportsService::class.java)
 
@@ -87,7 +97,7 @@ class ReportsService(
 
             val permissions = permissionRepository.findAllByGroupsAndDateRange(groups, startDate, endDate)
             logger.info("Loaded meal permissions for report: loginMasked={}, permissionsCount={}", loginMasked, permissions.size)
-            val permissionByStudentDate = mutableMapOf<StudentDateKey, com.example.demo.core.database.entity.MealPermissionEntity>()
+            val permissionByStudentDate = mutableMapOf<StudentDateKey, MealPermissionEntity>()
             permissions.forEach { permission ->
                 val studentId = permission.student.id ?: return@forEach
                 val key = StudentDateKey(studentId, permission.date)
@@ -146,7 +156,15 @@ class ReportsService(
                             breakfastScannedByName = breakfastTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) },
                             lunchUsed = lunchTx != null,
                             lunchTransactionId = lunchTx?.id,
-                            lunchScannedByName = lunchTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) }
+                            lunchScannedByName = lunchTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) },
+                            plannedBreakfast = permission?.isBreakfastAllowed == true,
+                            plannedLunch = permission?.isLunchAllowed == true,
+                            noMealReasonType = permission?.noMealReasonType,
+                            noMealReasonText = permission?.noMealReasonText,
+                            absenceFrom = permission?.absenceFrom,
+                            absenceTo = permission?.absenceTo,
+                            comment = permission?.comment,
+                            isSyntheticMissingRoster = permission?.noMealReasonType == NoMealReasonType.MISSING_ROSTER,
                         )
                     }
                 }
@@ -176,6 +194,79 @@ class ReportsService(
         }
     }
 
+    fun generateConsumptionSummary(
+        currentLogin: String,
+        startDate: LocalDate,
+        endDate: LocalDate,
+        groupId: Int?,
+        assignedByRoleFilter: AssignedByRoleFilter,
+    ): ConsumptionSummaryResponse {
+        if (endDate.isBefore(startDate)) {
+            throw RuntimeException("Дата окончания не может быть раньше даты начала")
+        }
+
+        val rows = generateConsumptionReport(
+            currentLogin = currentLogin,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRoleFilter,
+        )
+
+        val days = buildDateRange(startDate, endDate).map { date ->
+            val dateRows = rows.filter { it.date == date }
+            ConsumptionSummaryDay(
+                date = date,
+                breakfastCount = dateRows.count { it.plannedBreakfast },
+                lunchCount = dateRows.count { it.plannedLunch },
+                bothCount = dateRows.count { it.plannedBreakfast && it.plannedLunch },
+            )
+        }
+
+        val currentUser = userRepository.findByLogin(currentLogin)
+            ?: throw RuntimeException("Пользователь не найден")
+
+        val weekStartFrom = rosterWeekPolicy.weekStart(startDate)
+        val weekStartTo = rosterWeekPolicy.weekStart(endDate)
+        val audits = curatorWeekAuditRepository.findAllByWeekStartBetween(weekStartFrom, weekStartTo)
+
+        val filteredAudits = when {
+            currentUser.roles.contains(Role.ADMIN) -> audits
+            currentUser.roles.contains(Role.CURATOR) -> audits.filter { it.curator.id == currentUser.id }
+            else -> emptyList()
+        }
+
+        val zeroFillCurators = filteredAudits
+            .filter { it.fillStatus == CuratorWeekFillStatus.ZERO_FILL }
+            .map { audit ->
+                val curatorId = audit.curator.id ?: throw RuntimeException("У куратора отсутствует id")
+                val groupIds = groupRepository.findAllByCuratorId(curatorId)
+                    .mapNotNull { it.id }
+                    .sorted()
+                ZeroFillCuratorSummary(
+                    curatorId = curatorId,
+                    curatorName = fullName(audit.curator.surname, audit.curator.name, audit.curator.fatherName),
+                    weekStart = audit.weekStart,
+                    groupIds = groupIds,
+                    filledCells = audit.filledCells,
+                    expectedCells = audit.expectedCells,
+                    fillStatus = audit.fillStatus,
+                )
+            }
+            .sortedWith(compareBy({ it.weekStart }, { it.curatorName }))
+
+        return ConsumptionSummaryResponse(
+            startDate = startDate,
+            endDate = endDate,
+            days = days,
+            totalBreakfastCount = days.sumOf { it.breakfastCount },
+            totalLunchCount = days.sumOf { it.lunchCount },
+            totalBothCount = days.sumOf { it.bothCount },
+            missingRosterRowsCount = rows.count { it.noMealReasonType == NoMealReasonType.MISSING_ROSTER },
+            zeroFillCurators = zeroFillCurators,
+        )
+    }
+
     fun exportToCsv(
         currentLogin: String,
         startDate: LocalDate,
@@ -186,6 +277,7 @@ class ReportsService(
         val rows = generateConsumptionReport(currentLogin, startDate, endDate, groupId, assignedByRoleFilter)
         val header =
             "Дата,ID группы,Группа,ID студента,Студент,Категория,Роль назначившего,ФИО назначившего," +
+                "План завтрак,План обед,Причина непитания,Текст причины,Период с,Период по,Комментарий," +
                 "Завтрак использован,ID транзакции завтрака,ФИО сканировавшего завтрак," +
                 "Обед использован,ID транзакции обеда,ФИО сканировавшего обед\n"
         val body = rows.joinToString("\n") {
@@ -198,6 +290,13 @@ class ReportsService(
                 studentCategoryTitleRu(it.category),
                 assignedByRoleTitleRu(it.assignedByRole),
                 it.assignedByName ?: "-",
+                yesNo(it.plannedBreakfast),
+                yesNo(it.plannedLunch),
+                it.noMealReasonType?.name ?: "-",
+                it.noMealReasonText ?: "-",
+                it.absenceFrom?.toString() ?: "-",
+                it.absenceTo?.toString() ?: "-",
+                it.comment ?: "-",
                 yesNo(it.breakfastUsed),
                 it.breakfastTransactionId?.toString() ?: "-",
                 it.breakfastScannedByName ?: "-",
@@ -223,7 +322,7 @@ class ReportsService(
 
     private fun resolveAccessibleGroups(
         roles: Set<Role>,
-        userId: java.util.UUID?,
+        userId: UUID?,
         groupId: Int?
     ): List<GroupEntity> {
         if (roles.contains(Role.ADMIN)) {
@@ -242,7 +341,7 @@ class ReportsService(
         throw RuntimeException("Недостаточно прав для просмотра отчетов")
     }
 
-    private fun resolveAssignedByRole(permission: com.example.demo.core.database.entity.MealPermissionEntity): AssignedByRole {
+    private fun resolveAssignedByRole(permission: MealPermissionEntity): AssignedByRole {
         return if (permission.assignedBy.roles.contains(Role.ADMIN)) {
             AssignedByRole.ADMIN
         } else {

@@ -1,8 +1,10 @@
 package com.example.demo.features.workers
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.notifications.service.NotificationService
+import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -10,31 +12,67 @@ import org.springframework.stereotype.Component
 @Component
 class NotificationWorker(
     private val userRepository: UserRepository,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val rosterWeekPolicy: RosterWeekPolicy,
 ) {
     private val log = LoggerFactory.getLogger(NotificationWorker::class.java)
 
-    // Проверяем табели каждый день в 10:00
-    @Scheduled(cron = "0 0 10 * * ?")
-    fun checkRostersAndNotify() {
-        log.info("Running NotificationWorker to check curators rosters...")
-        val curators = userRepository.findAllByRole(Role.CURATOR)
-        for (curator in curators) {
+    // Базовое напоминание для Пн-Чт.
+    @Scheduled(cron = "0 0 10 * * ?", zone = "\${app.business-zone:Europe/Samara}")
+    fun sendDailyCuratorReminders() {
+        val now = rosterWeekPolicy.now()
+        if (now.dayOfWeek == java.time.DayOfWeek.FRIDAY || now.dayOfWeek == java.time.DayOfWeek.SATURDAY || now.dayOfWeek == java.time.DayOfWeek.SUNDAY) {
+            return
+        }
+
+        log.info("Running daily curator reminder worker at {}", now)
+        val curators = userRepository.findAllByRoleAndAccountStatus(Role.CURATOR, AccountStatus.ACTIVE)
+        curators.forEach { curator ->
             try {
-                val status = notificationService.checkCuratorRosterStatus(curator.login)
-                val needsReminder = status["needsReminder"] as? Boolean ?: false
-                
-                if (needsReminder) {
-                    val daysLeft = status["daysUntilDeadline"] as? Int ?: 0
-                    notificationService.sendNotification(
-                        user = curator,
-                        title = "Напоминание о табеле",
-                        message = "Вам необходимо заполнить табель питания на следующую неделю. Осталось дней до дедлайна: ${daysLeft}."
-                    )
-                }
+                notificationService.sendCuratorDailyReminderIfNeeded(curator)
             } catch (e: Exception) {
-                log.error("Failed to check roster for ${curator.login}", e)
+                log.error("Failed daily reminder for {}", curator.login, e)
             }
+        }
+    }
+
+    // Пятничная эскалация: каждый час до 12:00, только если нулевое заполнение.
+    @Scheduled(cron = "0 0 * * * ?", zone = "\${app.business-zone:Europe/Samara}")
+    fun sendFridayHourlyEscalation() {
+        val now = rosterWeekPolicy.now()
+        if (now.dayOfWeek != java.time.DayOfWeek.FRIDAY || now.hour >= 12) {
+            return
+        }
+
+        log.info("Running friday hourly escalation worker at {}", now)
+        val curators = userRepository.findAllByRoleAndAccountStatus(Role.CURATOR, AccountStatus.ACTIVE)
+        curators.forEach { curator ->
+            try {
+                notificationService.sendCuratorHourlyReminderIfZeroFill(curator)
+            } catch (e: Exception) {
+                log.error("Failed hourly reminder for {}", curator.login, e)
+            }
+        }
+    }
+
+    // После дедлайна напоминаем поварам о доступном недельном отчете.
+    @Scheduled(cron = "0 5 12 * * ?", zone = "\${app.business-zone:Europe/Samara}")
+    fun sendChefReportAvailabilityAfterDeadline() {
+        val now = rosterWeekPolicy.now()
+        if (now.dayOfWeek != java.time.DayOfWeek.FRIDAY) {
+            return
+        }
+
+        val weekStart = rosterWeekPolicy.nextWeekStart(now.toLocalDate()).toString()
+        try {
+            val sent = notificationService.notifyChefsWeeklyReportAvailable(weekStart)
+            if (sent > 0) {
+                log.info("Chef weekly report notifications sent: weekStart={}, count={}", weekStart, sent)
+            } else {
+                log.info("Chef weekly report notifications already sent or no active chefs: weekStart={}", weekStart)
+            }
+        } catch (e: Exception) {
+            log.error("Failed to notify chefs for weekStart={}", weekStart, e)
         }
     }
 }

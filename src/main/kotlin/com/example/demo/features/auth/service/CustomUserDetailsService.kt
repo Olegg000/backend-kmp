@@ -1,5 +1,6 @@
 package com.example.demo.features.auth.service
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.repository.UserRepository
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.User
@@ -15,7 +16,15 @@ class CustomUserDetailsService(private val userRepo: UserRepository) : UserDetai
 
         // Превращаем Set<Role> в List<SimpleGrantedAuthority>
         val authorities = user.roles.map { SimpleGrantedAuthority("ROLE_${it.name}") }
-
-        return User(user.login, user.passwordHash, authorities)
+        val isActive = user.accountStatus == AccountStatus.ACTIVE
+        return User(
+            user.login,
+            user.passwordHash,
+            isActive,
+            true,
+            true,
+            isActive,
+            authorities
+        )
     }
 }

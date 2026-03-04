@@ -7,22 +7,29 @@ import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
+import com.example.demo.core.database.repository.NotificationRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.notifications.service.NotificationService
+import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import java.time.Clock
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 
 @DataJpaTest
-@Import(NotificationService::class)
+@Import(NotificationService::class, RosterWeekPolicy::class, NotificationServiceTest.FixedFridayClockConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("NotificationService - напоминания по табелю")
 class NotificationServiceTest(
@@ -30,8 +37,19 @@ class NotificationServiceTest(
     @Autowired private val notificationService: NotificationService,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val groupRepository: GroupRepository,
-    @Autowired private val permissionRepository: MealPermissionRepository
+    @Autowired private val permissionRepository: MealPermissionRepository,
+    @Autowired private val notificationRepository: NotificationRepository,
 ) {
+
+    @TestConfiguration
+    class FixedFridayClockConfig {
+        @Bean
+        fun businessZoneId(): ZoneId = ZoneId.of("Europe/Samara")
+
+        @Bean
+        fun businessClock(zoneId: ZoneId): Clock =
+            Clock.fixed(Instant.parse("2026-03-06T07:00:00Z"), zoneId)
+    }
 
     private lateinit var group: GroupEntity
     private lateinit var curator: UserEntity
@@ -93,8 +111,8 @@ class NotificationServiceTest(
 
         val result = notificationService.checkCuratorRosterStatus(curatorNoGroup.login)
 
-        assertEquals(false, result["needsReminder"])
-        val reason = result["reason"] as? String
+        assertEquals(false, result.needsReminder)
+        val reason = result.reason
         assertNotNull(reason)
         assertTrue(reason!!.contains("не привязан"))
     }
@@ -104,9 +122,9 @@ class NotificationServiceTest(
     fun `no permissions next week should require reminder`() {
         val result = notificationService.checkCuratorRosterStatus(curator.login)
 
-        assertEquals(true, result["needsReminder"])
-        assertTrue(result["daysUntilDeadline"] is Int)
-        assertNotNull(result["deadlineDate"])
+        assertEquals(true, result.needsReminder)
+        assertNotNull(result.daysUntilDeadline)
+        assertNotNull(result.deadlineDate)
     }
 
     @Test
@@ -128,6 +146,17 @@ class NotificationServiceTest(
 
         val result = notificationService.checkCuratorRosterStatus(curator.login)
 
-        assertEquals(false, result["needsReminder"])
+        assertEquals(false, result.needsReminder)
+    }
+
+    @Test
+    @DisplayName("Пятничное hourly-напоминание шлется только при zero fill и без дублей")
+    fun `hourly reminder should be sent once per bucket for zero fill`() {
+        val sent1 = notificationService.sendCuratorHourlyReminderIfZeroFill(curator)
+        val sent2 = notificationService.sendCuratorHourlyReminderIfZeroFill(curator)
+
+        assertTrue(sent1)
+        assertFalse(sent2)
+        assertEquals(1, notificationRepository.findAllByUserOrderByCreatedAtDesc(curator).size)
     }
 }

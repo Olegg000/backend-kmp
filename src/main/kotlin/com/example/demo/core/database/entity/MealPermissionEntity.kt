@@ -1,7 +1,10 @@
 package com.example.demo.core.database.entity
 
+import com.example.demo.core.database.NoMealReasonType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -44,5 +47,21 @@ class MealPermissionEntity (
 
     @Column(name="lunch", nullable = false)
     var isLunchAllowed: Boolean = false,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "no_meal_reason_type")
+    var noMealReasonType: NoMealReasonType? = null,
+
+    @Column(name = "no_meal_reason_text", length = 512)
+    var noMealReasonText: String? = null,
+
+    @Column(name = "absence_from")
+    var absenceFrom: LocalDate? = null,
+
+    @Column(name = "absence_to")
+    var absenceTo: LocalDate? = null,
+
+    @Column(columnDefinition = "TEXT")
+    var comment: String? = null,
 
 )

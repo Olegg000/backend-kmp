@@ -1,5 +1,7 @@
 package com.example.demo.features.qr.dto
 
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -23,4 +25,21 @@ data class StudentPermissionDto(
     val surname: String,
     val breakfast: Boolean,
     val lunch: Boolean
+)
+
+data class ChefWeeklyReportDayDto(
+    val date: LocalDate,
+    val breakfastCount: Int,
+    val lunchCount: Int,
+    val bothCount: Int,
+)
+
+data class ChefWeeklyReportDto(
+    val weekStart: LocalDate,
+    val days: List<ChefWeeklyReportDayDto>,
+    val totalBreakfastCount: Int,
+    val totalLunchCount: Int,
+    val totalBothCount: Int,
+    val confirmed: Boolean,
+    val confirmedAt: LocalDateTime? = null,
 )

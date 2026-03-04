@@ -139,25 +139,37 @@ class FullFlowTest {
     @DisplayName("Сценарий 1: Успешный полный цикл (Happy Path)")
     fun `full happy path - from roster to meal transaction`() {
         val today = LocalDate.now()
-        val monday = today.with(java.time.DayOfWeek.MONDAY)
+        val nextMonday = today.with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY))
 
         // === ШАГ 1: Куратор заполняет табель ===
         println("\n=== ШАГ 1: Куратор заполняет табель ===")
         val rosterRequest = UpdateRosterRequest(
             studentId = student.id!!,
             permissions = listOf(
-                DayPermissionDto(today, true, true, "Учебный день")
+                DayPermissionDto(nextMonday, true, true, "Учебный день")
             )
         )
         rosterService.updateRoster(rosterRequest, curator.login)
 
         // Проверка: табель сохранён
-        val permission = permissionRepository.findByStudentAndDate(student, today)
+        val permission = permissionRepository.findByStudentAndDate(student, nextMonday)
         assertNotNull(permission, "Разрешение должно быть создано")
         assertTrue(permission!!.isBreakfastAllowed, "Завтрак разрешён")
         assertTrue(permission.isLunchAllowed, "Обед разрешён")
 
         println("✅ Табель заполнен: Завтрак=true, Обед=true")
+
+        // Для онлайн-валидации в интеграционном сценарии создаём разрешение на текущую дату
+        permissionRepository.save(
+            MealPermissionEntity(
+                date = today,
+                student = student,
+                assignedBy = curator,
+                reason = "Интеграционный тест",
+                isBreakfastAllowed = true,
+                isLunchAllowed = true,
+            )
+        )
 
         // === ШАГ 2: Студент генерирует QR-код ===
         println("\n=== ШАГ 2: Студент генерирует QR ===")

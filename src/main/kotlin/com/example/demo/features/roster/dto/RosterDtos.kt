@@ -1,5 +1,6 @@
 package com.example.demo.features.roster.dto
 
+import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.StudentCategory
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotNull
@@ -20,13 +21,18 @@ data class DayPermissionDto(
     val date: LocalDate,
     val isBreakfast: Boolean,
     val isLunch: Boolean,
-    val reason: String? = null // Причина (если не ест)
+    val reason: String? = null,
+    val noMealReasonType: NoMealReasonType? = null,
+    val noMealReasonText: String? = null,
+    val absenceFrom: LocalDate? = null,
+    val absenceTo: LocalDate? = null,
+    val comment: String? = null,
 )
 
 // Запрос от Куратора
 data class UpdateRosterRequest(
     @field:NotNull
     val studentId: UUID,
-    @field:Size(min = 1, max = 7)
+    @field:Size(min = 1, max = 5)
     val permissions: List<@Valid DayPermissionDto>
 )

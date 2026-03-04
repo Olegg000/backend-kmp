@@ -17,3 +17,15 @@ data class NotificationPageDto(
 data class MarkReadBatchRequest(
     val ids: List<Long>
 )
+
+data class RosterDeadlineStatusDto(
+    val cutoffDateTime: String,
+    val weekStart: String,
+    val isSubmitted: Boolean,
+    val isLocked: Boolean,
+    val severity: String,
+    val needsReminder: Boolean,
+    val daysUntilDeadline: Int? = null,
+    val deadlineDate: String? = null,
+    val reason: String? = null,
+)

@@ -29,6 +29,15 @@ class JwtFilter(
             if (jwtUtils.validateToken(token)) {
                 val login = jwtUtils.getLoginFromToken(token)
                 val userDetails = userDetailsService.loadUserByUsername(login)
+                if (!userDetails.isEnabled || !userDetails.isAccountNonLocked) {
+                    response.status = HttpServletResponse.SC_FORBIDDEN
+                    response.contentType = "application/json"
+                    response.characterEncoding = "UTF-8"
+                    response.writer.write(
+                        """{"code":"ACCOUNT_FROZEN_EXPELLED","message":"ACCESS_DENIED","userMessage":"Аккаунт отчисленного пользователя заблокирован","retryable":false,"status":403}"""
+                    )
+                    return
+                }
 
                 val auth = UsernamePasswordAuthenticationToken(userDetails, null, userDetails.authorities)
                 auth.details = WebAuthenticationDetailsSource().buildDetails(request)

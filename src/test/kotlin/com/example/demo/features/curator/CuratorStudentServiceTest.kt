@@ -1,6 +1,7 @@
 package com.example.demo.features.curator
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.config.TimeConfig
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
@@ -9,6 +10,7 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.curator.dto.CuratorStudentCategoryUpdateRequest
 import com.example.demo.features.curator.service.CuratorStudentService
+import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -21,7 +23,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 
 @DataJpaTest
-@Import(CuratorStudentService::class)
+@Import(CuratorStudentService::class, RosterWeekPolicy::class, TimeConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("CuratorStudentService - смена категории и список")
 class CuratorStudentServiceTest(

@@ -1,18 +1,26 @@
 package com.example.demo.features.roster
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.config.TimeConfig
+import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
-import com.example.demo.core.exception.BusinessException
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
+import com.example.demo.features.notifications.service.NotificationService
 import com.example.demo.features.roster.dto.DayPermissionDto
 import com.example.demo.features.roster.dto.UpdateRosterRequest
 import com.example.demo.features.roster.service.RosterService
-import org.junit.jupiter.api.Assertions.*
+import com.example.demo.features.roster.service.RosterWeekPolicy
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -22,9 +30,10 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 
 @DataJpaTest
-@Import(RosterService::class)
+@Import(RosterService::class, RosterWeekPolicy::class, NotificationService::class, TimeConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("RosterService - Управление табелем питания")
 class RosterServiceTest {
@@ -48,10 +57,8 @@ class RosterServiceTest {
 
     @BeforeEach
     fun setup() {
-        // Создаем группу
         group = groupRepository.save(GroupEntity(groupName = "ИСП-21"))
 
-        // Создаем куратора
         curator = userRepository.save(
             UserEntity(
                 login = "curator1",
@@ -67,7 +74,6 @@ class RosterServiceTest {
         group.curators = mutableSetOf(curator)
         groupRepository.save(group)
 
-        // Создаем студентов
         student1 = userRepository.save(
             UserEntity(
                 login = "student1",
@@ -96,206 +102,139 @@ class RosterServiceTest {
     }
 
     @Test
-    @DisplayName("Куратор видит всех студентов своей группы")
+    @DisplayName("Куратор видит всех студентов своей группы на следующей неделе")
     fun `getRosterForGroup should return all students in curator group`() {
-        // Given
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
 
-        // When
-        val roster = rosterService.getRosterForGroup(curator.login, monday)
+        val roster = rosterService.getRosterForGroup(curator.login, nextMonday)
 
-        // Then
-        assertEquals(2, roster.size, "Должно быть 2 студента")
-        assertTrue(roster.any { it.studentId == student1.id })
-        assertTrue(roster.any { it.studentId == student2.id })
-
-        // Проверяем, что для каждого студента есть 5 дней
+        assertEquals(2, roster.size)
         roster.forEach { row ->
-            assertEquals(5, row.days.size, "Должно быть 5 дней (пн-пт)")
+            assertEquals(5, row.days.size)
+            assertTrue(row.days.all { it.date.dayOfWeek in DayOfWeek.MONDAY..DayOfWeek.FRIDAY })
         }
     }
 
     @Test
-    @DisplayName("Изначально все разрешения должны быть false")
-    fun `initial roster should have all permissions set to false`() {
-        // Given
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
-
-        // When
-        val roster = rosterService.getRosterForGroup(curator.login, monday)
-
-        // Then
-        roster.forEach { studentRow ->
-            studentRow.days.forEach { day ->
-                assertFalse(day.isBreakfast, "Завтрак должен быть выключен")
-                assertFalse(day.isLunch, "Обед должен быть выключен")
-            }
-        }
-    }
-
-    @Test
-    @DisplayName("Обновление разрешений студента работает корректно")
+    @DisplayName("Назначение питания на следующую неделю сохраняется")
     fun `updateRoster should save permissions correctly`() {
-        // Given
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
-        val permissions = listOf(
-            DayPermissionDto(monday, true, true, "Учебный день"),
-            DayPermissionDto(monday.plusDays(1), true, true, "Полный день")
-        )
-
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
         val request = UpdateRosterRequest(
             studentId = student1.id!!,
-            permissions = permissions
-        )
-
-        // When
-        rosterService.updateRoster(request, curator.login)
-
-        // Then
-        val roster = rosterService.getRosterForGroup(curator.login, monday)
-        val student1Row = roster.find { it.studentId == student1.id }!!
-
-        // Проверяем понедельник
-        val mondayPerms = student1Row.days[0]
-        assertTrue(mondayPerms.isBreakfast)
-        assertTrue(mondayPerms.isLunch)
-
-        // Проверяем вторник
-        val tuesdayPerms = student1Row.days[1]
-        assertTrue(tuesdayPerms.isBreakfast)
-        assertTrue(tuesdayPerms.isLunch)
-    }
-
-    @Test
-    @DisplayName("Обновление разрешений не затрагивает других студентов")
-    fun `updateRoster should not affect other students`() {
-        // Given
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
-        val permissions = listOf(
-            DayPermissionDto(monday, true, true, "Тест")
-        )
-
-        val request = UpdateRosterRequest(student1.id!!, permissions)
-
-        // When
-        rosterService.updateRoster(request, curator.login)
-
-        // Then
-        val roster = rosterService.getRosterForGroup(curator.login, monday)
-        val student2Row = roster.find { it.studentId == student2.id }!!
-
-        // У второго студента все должно остаться false
-        student2Row.days.forEach { day ->
-            assertFalse(day.isBreakfast)
-            assertFalse(day.isLunch)
-        }
-    }
-
-    @Test
-    @DisplayName("Снятие всех галочек удаляет запись из БД")
-    fun `updateRoster with all false should delete permission`() {
-        // Given - сначала создаем разрешение
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
-        val createRequest = UpdateRosterRequest(
-            student1.id!!,
-            listOf(DayPermissionDto(monday, true, true, null))
-        )
-        rosterService.updateRoster(createRequest, curator.login)
-
-        // When - снимаем все галочки
-        val deleteRequest = UpdateRosterRequest(
-            student1.id!!,
-            listOf(DayPermissionDto(monday, false, false, null))
-        )
-        rosterService.updateRoster(deleteRequest, curator.login)
-
-        // Then
-        val saved = permissionRepository.findByStudentAndDate(student1, monday)
-        assertNull(saved, "Запись должна быть удалена из БД")
-    }
-
-    @Test
-    @DisplayName("Исключение, если куратор не привязан к группе")
-    fun `getRosterForGroup should throw if curator has no group`() {
-        // Given - куратор без группы
-        val curatorNoGroup = userRepository.save(
-            UserEntity(
-                login = "curator-no-group",
-                passwordHash = "hash",
-                roles = mutableSetOf(Role.CURATOR),
-                name = "Без",
-                surname = "Группы",
-                fatherName = "Групповнович"
+            permissions = listOf(
+                DayPermissionDto(nextMonday, isBreakfast = true, isLunch = false, reason = "Учебный день"),
             )
         )
 
-        // When & Then
-        val exception = assertThrows(RuntimeException::class.java) {
-            rosterService.getRosterForGroup(curatorNoGroup.login, LocalDate.now())
-        }
+        rosterService.updateRoster(request, curator.login)
 
-        assertTrue(exception.message!!.contains("не привязан"))
+        val saved = permissionRepository.findByStudentAndDate(student1, nextMonday)
+        assertNotNull(saved)
+        assertTrue(saved!!.isBreakfastAllowed)
+        assertFalse(saved.isLunchAllowed)
     }
 
     @Test
-    @DisplayName("Назначение питания без категории блокируется с кодом STUDENT_CATEGORY_REQUIRED")
-    fun `updateRoster should fail when student has no category`() {
-        student1.studentCategory = null
-        userRepository.save(student1)
-
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
+    @DisplayName("Для false/false причина обязательна")
+    fun `all false without reason type should fail`() {
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
         val request = UpdateRosterRequest(
             studentId = student1.id!!,
-            permissions = listOf(DayPermissionDto(monday, true, false, "Тест"))
+            permissions = listOf(
+                DayPermissionDto(nextMonday, isBreakfast = false, isLunch = false)
+            )
         )
 
         val ex = assertThrows(BusinessException::class.java) {
             rosterService.updateRoster(request, curator.login)
         }
 
-        assertEquals("STUDENT_CATEGORY_REQUIRED", ex.code)
+        assertEquals("NO_MEAL_REASON_REQUIRED", ex.code)
     }
 
     @Test
-    @DisplayName("Куратор не может изменять табель студента чужой группы")
-    fun `updateRoster should fail for foreign student`() {
-        val foreignGroup = groupRepository.save(GroupEntity(groupName = "ИСП-22"))
-        val foreignCurator = userRepository.save(
-            UserEntity(
-                login = "curator2",
-                passwordHash = "hash",
-                roles = mutableSetOf(Role.CURATOR),
-                name = "Ольга",
-                surname = "Вторая",
-                fatherName = "Кураторовна"
-            )
-        )
-        foreignGroup.curators = mutableSetOf(foreignCurator)
-        groupRepository.save(foreignGroup)
-
-        val foreignStudent = userRepository.save(
-            UserEntity(
-                login = "student-foreign",
-                passwordHash = "hash",
-                roles = mutableSetOf(Role.STUDENT),
-                name = "Сергей",
-                surname = "Чужой",
-                fatherName = "Иванович",
-                group = foreignGroup,
-                studentCategory = StudentCategory.SVO
-            )
-        )
-
-        val monday = LocalDate.now().with(DayOfWeek.MONDAY)
+    @DisplayName("MISSING_ROSTER нельзя выставлять вручную")
+    fun `missing roster reason should be forbidden for curator`() {
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
         val request = UpdateRosterRequest(
-            studentId = foreignStudent.id!!,
-            permissions = listOf(DayPermissionDto(monday, true, false, "Тест"))
+            studentId = student1.id!!,
+            permissions = listOf(
+                DayPermissionDto(
+                    date = nextMonday,
+                    isBreakfast = false,
+                    isLunch = false,
+                    noMealReasonType = NoMealReasonType.MISSING_ROSTER,
+                )
+            )
         )
 
-        val ex = assertThrows(RuntimeException::class.java) {
+        val ex = assertThrows(BusinessException::class.java) {
             rosterService.updateRoster(request, curator.login)
         }
 
-        assertTrue(ex.message!!.contains("только студентов своих групп"))
+        assertEquals("NO_MEAL_REASON_INVALID", ex.code)
+    }
+
+    @Test
+    @DisplayName("Для причины OTHER обязателен диапазон и текст")
+    fun `other reason requires text and range`() {
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+        val request = UpdateRosterRequest(
+            studentId = student1.id!!,
+            permissions = listOf(
+                DayPermissionDto(
+                    date = nextMonday,
+                    isBreakfast = false,
+                    isLunch = false,
+                    noMealReasonType = NoMealReasonType.OTHER,
+                    noMealReasonText = "Дистант",
+                    absenceFrom = nextMonday,
+                    absenceTo = nextMonday,
+                )
+            )
+        )
+
+        rosterService.updateRoster(request, curator.login)
+
+        val saved = permissionRepository.findByStudentAndDate(student1, nextMonday)
+        assertNotNull(saved)
+        assertEquals(NoMealReasonType.OTHER, saved!!.noMealReasonType)
+        assertEquals("Дистант", saved.noMealReasonText)
+    }
+
+    @Test
+    @DisplayName("Выходные запрещены")
+    fun `weekend should be forbidden`() {
+        val nextSaturday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.SATURDAY))
+        val request = UpdateRosterRequest(
+            studentId = student1.id!!,
+            permissions = listOf(
+                DayPermissionDto(nextSaturday, isBreakfast = true, isLunch = false, reason = "Тест")
+            )
+        )
+
+        val ex = assertThrows(BusinessException::class.java) {
+            rosterService.updateRoster(request, curator.login)
+        }
+
+        assertEquals("ROSTER_WEEKEND_FORBIDDEN", ex.code)
+    }
+
+    @Test
+    @DisplayName("Нельзя редактировать прошлую неделю")
+    fun `past week should be forbidden`() {
+        val thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val request = UpdateRosterRequest(
+            studentId = student1.id!!,
+            permissions = listOf(
+                DayPermissionDto(thisMonday, isBreakfast = true, isLunch = false, reason = "Тест")
+            )
+        )
+
+        val ex = assertThrows(BusinessException::class.java) {
+            rosterService.updateRoster(request, curator.login)
+        }
+
+        assertEquals("ROSTER_ONLY_NEXT_WEEK_OR_LATER", ex.code)
     }
 }

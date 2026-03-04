@@ -2,6 +2,7 @@ package com.example.demo.features.notifications.controller
 
 import com.example.demo.features.notifications.dto.MarkReadBatchRequest
 import com.example.demo.features.notifications.dto.NotificationPageDto
+import com.example.demo.features.notifications.dto.RosterDeadlineStatusDto
 import com.example.demo.features.notifications.service.NotificationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -26,7 +27,7 @@ class NotificationController(
 
     @GetMapping("/roster-deadline")
     @Operation(summary = "Check curator roster deadline status")
-    fun checkRosterDeadline(principal: Principal): Map<String, Any> {
+    fun checkRosterDeadline(principal: Principal): RosterDeadlineStatusDto {
         return notificationService.checkCuratorRosterStatus(principal.name)
     }
 
@@ -63,4 +64,3 @@ class NotificationController(
         return ResponseEntity.ok().build()
     }
 }
-

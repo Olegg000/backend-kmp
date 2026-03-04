@@ -1,5 +1,6 @@
 package com.example.demo.features.auth.dto
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import jakarta.validation.constraints.NotBlank
@@ -73,7 +74,13 @@ data class AdminUserDto(
     val surname: String,
     val fatherName: String,
     val groupId: Int?,
-    val studentCategory: StudentCategory?
+    val studentCategory: StudentCategory?,
+    val accountStatus: AccountStatus,
+)
+
+data class UpdateLifecycleRequest(
+    val status: AccountStatus,
+    val expelNote: String? = null,
 )
 
 data class AuthKeysDto(

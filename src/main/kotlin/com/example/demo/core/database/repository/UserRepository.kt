@@ -1,5 +1,6 @@
 package com.example.demo.core.database.repository
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
@@ -21,6 +22,12 @@ interface UserRepository: JpaRepository<UserEntity, UUID> {
     // Найти всех пользователей с определенной ролью
     @Query("SELECT u FROM UserEntity u JOIN u.roles r WHERE r = :role")
     fun findAllByRole(@Param("role") role: Role): List<UserEntity>
+
+    @Query("SELECT u FROM UserEntity u JOIN u.roles r WHERE r = :role AND u.accountStatus = :status")
+    fun findAllByRoleAndAccountStatus(
+        @Param("role") role: Role,
+        @Param("status") status: AccountStatus
+    ): List<UserEntity>
 
     @Query(
         """

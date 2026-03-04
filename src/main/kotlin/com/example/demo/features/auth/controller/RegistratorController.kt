@@ -4,6 +4,7 @@ import com.example.demo.core.database.Role
 import com.example.demo.features.auth.dto.AdminUserDto
 import com.example.demo.features.auth.dto.CreateUserRequest
 import com.example.demo.features.auth.dto.RegistrationDto
+import com.example.demo.features.auth.dto.UpdateLifecycleRequest
 import com.example.demo.features.auth.dto.UpdateUserRolesRequest
 import com.example.demo.features.auth.dto.UserCredentialsResponse
 import com.example.demo.features.auth.service.UserServiceQ
@@ -71,6 +72,22 @@ class RegistratorController(
         @RequestBody @Valid request: UpdateUserRolesRequest
     ): AdminUserDto {
         return userService.updateUserRoles(userId, request.roles, request.groupId, request.studentCategory)
+    }
+
+    @PatchMapping("/users/{userId}/lifecycle")
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
+    @Operation(summary = "Обновить lifecycle статус пользователя")
+    fun updateUserLifecycle(
+        principal: Principal,
+        @PathVariable userId: UUID,
+        @RequestBody @Valid request: UpdateLifecycleRequest
+    ): AdminUserDto {
+        return userService.updateUserLifecycle(
+            userId = userId,
+            status = request.status,
+            expelNote = request.expelNote,
+            requestedByLogin = principal.name,
+        )
     }
 
     @DeleteMapping("/users/{userId}")

@@ -14,7 +14,15 @@ interface MealPermissionRepository : JpaRepository<MealPermissionEntity, Int> {
 
     fun findAllByDate(date: LocalDate): List<MealPermissionEntity>
 
+    fun findAllByDateBetween(startDate: LocalDate, endDate: LocalDate): List<MealPermissionEntity>
+
     fun findAllByStudentAndDateIn(student: UserEntity, dates: List<LocalDate>): List<MealPermissionEntity>
+
+    fun findAllByStudentInAndDateBetween(
+        students: Collection<UserEntity>,
+        startDate: LocalDate,
+        endDate: LocalDate
+    ): List<MealPermissionEntity>
 
     // Найти все разрешения для студентов группы за период
     @Query("""
@@ -36,6 +44,34 @@ interface MealPermissionRepository : JpaRepository<MealPermissionEntity, Int> {
     """
     )
     fun findAllByGroupsAndDateRange(
+        @Param("groups") groups: Collection<GroupEntity>,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): List<MealPermissionEntity>
+
+    @Query(
+        """
+        SELECT COUNT(p)
+        FROM MealPermissionEntity p
+        WHERE p.student.group IN :groups
+          AND p.date BETWEEN :startDate AND :endDate
+    """
+    )
+    fun countByGroupsAndDateRange(
+        @Param("groups") groups: Collection<GroupEntity>,
+        @Param("startDate") startDate: LocalDate,
+        @Param("endDate") endDate: LocalDate
+    ): Long
+
+    @Query(
+        """
+        SELECT p
+        FROM MealPermissionEntity p
+        WHERE p.student.group IN :groups
+          AND p.date BETWEEN :startDate AND :endDate
+    """
+    )
+    fun findAllByGroupsAndDateRangeWithStudents(
         @Param("groups") groups: Collection<GroupEntity>,
         @Param("startDate") startDate: LocalDate,
         @Param("endDate") endDate: LocalDate
