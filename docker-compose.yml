@@ -11,9 +11,9 @@ services:
       - ./sql-scripts/:/docker-entrypoint-initdb.d/
       - pg_data:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: P@ssw0rd
-      POSTGRES_DB: pgk_food
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-P@ssw0rd}
+      POSTGRES_DB: ${POSTGRES_DB:-pgk_food}
     healthcheck:
       # ВОТ ЗДЕСЬ БЫЛ ПРОПУЩЕН ПРОБЕЛ ПОСЛЕ test:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -39,17 +39,26 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # профиль, под которым у тебя уже успешно гонялись тесты на Postgres
-      SPRING_PROFILES_ACTIVE: it-postgres
+      # Профиль оставляем test-like (it-postgres), но явным образом включаем bootstrap admin.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-it-postgres}
 
       # Перенастраиваем datasource так, чтобы приложение ходило в контейнер postgres
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/pgk_food
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: P@ssw0rd
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/pgk_food}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-P@ssw0rd}
 
       # JWT настройки — мапятся на jwt.secret и jwt.lifetime
-      JWT_SECRET: "this_is_a_very_long_jwt_secret_key_32+chars"
-      JWT_LIFETIME: 86400000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_LIFETIME: ${JWT_LIFETIME:-86400000}
+
+      # Bootstrap super-admin (required for first login in clean DB)
+      APP_BOOTSTRAP_ADMIN_ENABLED: ${APP_BOOTSTRAP_ADMIN_ENABLED:-true}
+      BOOTSTRAP_ADMIN_LOGIN: ${BOOTSTRAP_ADMIN_LOGIN:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-System}
+      BOOTSTRAP_ADMIN_SURNAME: ${BOOTSTRAP_ADMIN_SURNAME:-Administrator}
+      BOOTSTRAP_ADMIN_FATHER_NAME: ${BOOTSTRAP_ADMIN_FATHER_NAME:-Service}
+      BOOTSTRAP_ADMIN_GROUP_NAME: ${BOOTSTRAP_ADMIN_GROUP_NAME:-101}
 
       # (опционально) если хочешь явно указать стратегию DDL
       # SPRING_JPA_HIBERNATE_DDL_AUTO: update
