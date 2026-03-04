@@ -9,6 +9,7 @@ import com.example.demo.features.auth.dto.UserCredentialsResponse
 import com.example.demo.features.auth.service.UserServiceQ
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import jakarta.validation.Valid
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -33,14 +34,14 @@ class RegistratorController(
 ) {
 
     @PostMapping("/users")
-    fun createUser(@RequestBody dto: RegistrationDto) {
+    fun createUser(@RequestBody @Valid dto: RegistrationDto) {
         userService.registerUser(dto)
     }
 
     @PostMapping("/users/create")
     @PreAuthorize("hasAnyRole('REGISTRATOR', 'ADMIN')")
     @Operation(summary = "Создать пользователя и получить пароль")
-    fun createAuto(@RequestBody req: CreateUserRequest): UserCredentialsResponse {
+    fun createAuto(@RequestBody @Valid req: CreateUserRequest): UserCredentialsResponse {
         return userService.createUserAuto(req)
     }
 
@@ -67,7 +68,7 @@ class RegistratorController(
     fun updateUserRoles(
         principal: Principal,
         @PathVariable userId: UUID,
-        @RequestBody request: UpdateUserRolesRequest
+        @RequestBody @Valid request: UpdateUserRolesRequest
     ): AdminUserDto {
         return userService.updateUserRoles(userId, request.roles, request.groupId, request.studentCategory)
     }

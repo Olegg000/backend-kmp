@@ -9,6 +9,7 @@ import com.example.demo.features.roster.dto.DayPermissionDto
 import com.example.demo.features.student.dto.StudentSelfRosterDto
 import com.example.demo.features.student.dto.StudentTodayMealsDto
 import org.springframework.stereotype.Service
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 
@@ -16,13 +17,13 @@ import java.time.LocalDate
 class StudentService(
     private val userRepository: UserRepository,
     private val permissionRepository: MealPermissionRepository,
-    private val transactionRepository: MealTransactionRepository
+    private val transactionRepository: MealTransactionRepository,
+    private val businessClock: Clock,
 ) {
-
     fun getSelfRoster(login: String, startDate: LocalDate?): StudentSelfRosterDto {
         val student = findStudentByLogin(login)
 
-        val weekStart = (startDate ?: LocalDate.now()).with(DayOfWeek.MONDAY)
+        val weekStart = (startDate ?: LocalDate.now(businessClock)).with(DayOfWeek.MONDAY)
         val dates = (0..4).map { weekStart.plusDays(it.toLong()) }
 
         val permissions = permissionRepository
@@ -50,7 +51,7 @@ class StudentService(
 
     fun getTodayMeals(login: String): StudentTodayMealsDto {
         val student = findStudentByLogin(login)
-        val today = LocalDate.now()
+        val today = LocalDate.now(businessClock)
 
         val p = permissionRepository.findByStudentAndDate(student, today)
         

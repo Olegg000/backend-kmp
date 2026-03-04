@@ -2,10 +2,18 @@ package com.example.demo.features.auth.dto
 
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.Size
 import java.util.UUID
 
 data class Auth (
+    @field:NotBlank
+    @field:Size(min = 3, max = 64)
     val login: String,
+
+    @field:NotBlank
+    @field:Size(min = 6, max = 128)
     val password: String
 )
 
@@ -37,7 +45,12 @@ data class AuthMeResponse(
 )
 
 data class RegUser (
+    @field:NotBlank
+    @field:Size(min = 3, max = 64)
     val login: String,
+
+    @field:NotBlank
+    @field:Size(min = 6, max = 128)
     val password: String,
     val roles: Role,
     val name: String,
@@ -46,6 +59,7 @@ data class RegUser (
 )
 
 data class UpdateUserRolesRequest(
+    @field:NotEmpty
     val roles: Set<Role>,
     val groupId: Int? = null,
     val studentCategory: StudentCategory? = null,

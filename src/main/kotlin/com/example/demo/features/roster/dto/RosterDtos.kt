@@ -1,6 +1,9 @@
 package com.example.demo.features.roster.dto
 
 import com.example.demo.core.database.StudentCategory
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import java.time.LocalDate
 import java.util.UUID
 
@@ -22,6 +25,8 @@ data class DayPermissionDto(
 
 // Запрос от Куратора
 data class UpdateRosterRequest(
+    @field:NotNull
     val studentId: UUID,
-    val permissions: List<DayPermissionDto>
+    @field:Size(min = 1, max = 7)
+    val permissions: List<@Valid DayPermissionDto>
 )

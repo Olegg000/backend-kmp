@@ -21,7 +21,7 @@ class GlobalExceptionHandler {
         return buildError(
             status = e.status,
             code = e.code,
-            technicalMessage = e.message ?: e.userMessage,
+            message = e.code,
             userMessage = e.userMessage,
             retryable = e.retryable
         )
@@ -29,13 +29,13 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(RuntimeException::class)
     fun handleRuntime(e: RuntimeException): ResponseEntity<AppError> {
-        logger.error("Runtime exception", e)
+        logger.error("Unhandled runtime exception", e)
         return buildError(
-            status = HttpStatus.BAD_REQUEST,
-            code = "RUNTIME_ERROR",
-            technicalMessage = e.message ?: "Runtime error",
-            userMessage = e.message ?: "Request cannot be processed",
-            retryable = false
+            status = HttpStatus.INTERNAL_SERVER_ERROR,
+            code = "INTERNAL_RUNTIME_ERROR",
+            message = "INTERNAL_SERVER_ERROR",
+            userMessage = "Internal server error. Please retry later.",
+            retryable = true
         )
     }
 
@@ -45,7 +45,7 @@ class GlobalExceptionHandler {
         return buildError(
             status = HttpStatus.FORBIDDEN,
             code = "ACCESS_DENIED",
-            technicalMessage = e.message ?: "Access denied",
+            message = "ACCESS_DENIED",
             userMessage = "You do not have access to this action",
             retryable = false
         )
@@ -57,7 +57,7 @@ class GlobalExceptionHandler {
         return buildError(
             status = HttpStatus.UNAUTHORIZED,
             code = "INVALID_CREDENTIALS",
-            technicalMessage = e.message ?: "Invalid credentials",
+            message = "INVALID_CREDENTIALS",
             userMessage = "Invalid login or password",
             retryable = false
         )
@@ -70,9 +70,21 @@ class GlobalExceptionHandler {
         return buildError(
             status = HttpStatus.BAD_REQUEST,
             code = "VALIDATION_ERROR",
-            technicalMessage = errors,
+            message = "VALIDATION_ERROR",
             userMessage = "Validation error: $errors",
             retryable = false
+        )
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(e: IllegalArgumentException): ResponseEntity<AppError> {
+        logger.warn("Invalid request argument: {}", e.message)
+        return buildError(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_ARGUMENT",
+            message = "INVALID_ARGUMENT",
+            userMessage = "Invalid request payload",
+            retryable = false,
         )
     }
 
@@ -80,11 +92,11 @@ class GlobalExceptionHandler {
     fun handleIllegalState(e: IllegalStateException): ResponseEntity<AppError> {
         logger.error("Illegal state", e)
         return buildError(
-            status = HttpStatus.CONFLICT,
+            status = HttpStatus.INTERNAL_SERVER_ERROR,
             code = "ILLEGAL_STATE",
-            technicalMessage = e.message ?: "State conflict",
-            userMessage = e.message ?: "State conflict",
-            retryable = false
+            message = "ILLEGAL_STATE",
+            userMessage = "Operation failed. Please retry later.",
+            retryable = true
         )
     }
 
@@ -94,7 +106,7 @@ class GlobalExceptionHandler {
         return buildError(
             status = HttpStatus.INTERNAL_SERVER_ERROR,
             code = "INTERNAL_SERVER_ERROR",
-            technicalMessage = e.message ?: "Internal server error",
+            message = "INTERNAL_SERVER_ERROR",
             userMessage = "Internal server error. Please retry later.",
             retryable = true
         )
@@ -103,7 +115,7 @@ class GlobalExceptionHandler {
     private fun buildError(
         status: HttpStatus,
         code: String,
-        technicalMessage: String,
+        message: String,
         userMessage: String,
         retryable: Boolean
     ): ResponseEntity<AppError> {
@@ -111,7 +123,7 @@ class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(
             AppError(
                 code = code,
-                message = technicalMessage,
+                message = message,
                 userMessage = userMessage,
                 retryable = retryable,
                 status = status.value(),

@@ -101,12 +101,12 @@ class StudentControllerTest(
     }
 
     @Test
-    @DisplayName("Запрос без токена получает 403 (нет доступа)")
+    @DisplayName("Запрос без токена получает 401")
     fun `student endpoints require auth`() {
         mockMvc.perform(
             get("/api/v1/student/meals/today")
                 .accept(MediaType.APPLICATION_JSON)
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 }

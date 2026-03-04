@@ -8,6 +8,7 @@ import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
+import com.example.demo.features.auth.dto.RegistrationDto
 import com.example.demo.features.auth.dto.UpdateUserRolesRequest
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.DisplayName
@@ -285,5 +286,55 @@ class RegistratorUsersControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.length()").value(1))
             .andExpect(jsonPath("$[0].login").value(student.login))
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/registrator/users с дублирующимся login возвращает 409 и бизнес-код")
+    fun `create user with duplicate login returns conflict business code`() {
+        val token = createAdminToken()
+        userRepository.save(
+            UserEntity(
+                login = "duplicate-login",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Иван",
+                surname = "Дубликатов",
+                fatherName = "Тестович"
+            )
+        )
+        val request = RegistrationDto(
+            login = "duplicate-login",
+            password = "password123",
+            roles = setOf(Role.STUDENT),
+            name = "Новый",
+            surname = "Пользователь",
+            fatherName = "Тестович",
+            groupId = null,
+            studentCategory = null,
+        )
+
+        mockMvc.perform(
+            post("/api/v1/registrator/users")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("USER_ALREADY_EXISTS"))
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/registrator/users/{id} для самого себя возвращает 403 и бизнес-код")
+    fun `delete self returns forbidden business code`() {
+        val token = createAdminToken()
+        val admin = userRepository.findByLogin("admin-reg")
+            ?: error("Expected admin-reg to exist")
+
+        mockMvc.perform(
+            delete("/api/v1/registrator/users/${admin.id}")
+                .header("Authorization", "Bearer $token")
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("SELF_DELETE_FORBIDDEN"))
     }
 }

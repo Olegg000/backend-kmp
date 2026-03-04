@@ -104,7 +104,7 @@ class TransactionsControllerTest(
     }
 
     @Test
-    @DisplayName("POST batch без токена → 403 (доступ запрещен)")
+    @DisplayName("POST batch без токена → 401")
     fun `batch without token should be forbidden`() {
         val (_, _, student) = setupChefAndStudent()
 
@@ -122,7 +122,7 @@ class TransactionsControllerTest(
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(items))
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 
     @Test
@@ -148,6 +148,8 @@ class TransactionsControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.successCount").value(1))
             .andExpect(jsonPath("$.errors").isArray)
+            .andExpect(jsonPath("$.processed.length()").value(1))
+            .andExpect(jsonPath("$.processed[0].status").value("SUCCESS"))
     }
 
     @Test

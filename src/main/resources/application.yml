@@ -11,17 +11,24 @@ spring:
     password: ${DB_PASS}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
+      maximum-pool-size: 40
+      minimum-idle: 10
+      connection-timeout: 5000
+      max-lifetime: 1800000
+      idle-timeout: 600000
 
   sql:
     init:
       mode: never
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
   jpa:
     hibernate:
-      ddl-auto: update # В production: validate + Flyway/Liquibase
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -43,10 +50,10 @@ jwt:
 logging:
   level:
     root: INFO
-    com.example.demo: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.example.demo: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql.BasicBinder: OFF
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -64,3 +71,15 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+
+app:
+  business-zone: ${APP_BUSINESS_ZONE:Europe/Samara}
+
+security:
+  qr-offline-public: ${SECURITY_QR_OFFLINE_PUBLIC:false}
+  rate-limit:
+    enabled: true
+    use-forwarded-ip: ${SECURITY_RATE_LIMIT_USE_FORWARDED_IP:false}
+    login-per-minute: ${SECURITY_RATE_LIMIT_LOGIN_PER_MINUTE:60}
+    qr-per-minute: ${SECURITY_RATE_LIMIT_QR_PER_MINUTE:600}
+    batch-per-minute: ${SECURITY_RATE_LIMIT_BATCH_PER_MINUTE:300}

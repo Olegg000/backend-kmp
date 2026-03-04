@@ -1,17 +1,18 @@
 package com.example.demo.features.qr.service
 
-import com.example.demo.core.database.Role
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.qr.dto.StudentKeyDto
 import com.example.demo.features.qr.dto.StudentPermissionDto
 import org.springframework.stereotype.Service
+import java.time.Clock
 import java.time.LocalDate
 
 @Service
 class ChefDataService(
     private val userRepository: UserRepository,
-    private val permissionRepository: MealPermissionRepository
+    private val permissionRepository: MealPermissionRepository,
+    private val businessClock: Clock,
 ) {
 
     /**
@@ -19,8 +20,7 @@ class ChefDataService(
      * Повар скачивает их для оффлайн ECDSA верификации.
      */
     fun getAllStudentKeys(): List<StudentKeyDto> {
-        return userRepository.findAll()
-            .filter { it.roles.contains(Role.STUDENT) && it.publicKey != null }
+        return userRepository.findAllStudentsWithPublicKey()
             .map { user ->
                 StudentKeyDto(
                     userId = user.id!!,
@@ -38,7 +38,7 @@ class ChefDataService(
      * Повар скачивает для оффлайн-проверки разрешений.
      */
     fun getTodayPermissions(): List<StudentPermissionDto> {
-        val today = LocalDate.now()
+        val today = LocalDate.now(businessClock)
         val permissions = permissionRepository.findAllByDate(today)
 
         return permissions.map { perm ->

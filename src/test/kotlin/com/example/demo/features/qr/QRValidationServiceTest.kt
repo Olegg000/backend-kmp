@@ -1,11 +1,11 @@
 package com.example.demo.features.qr
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.config.TimeConfig
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.MealPermissionEntity
-import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
@@ -25,10 +25,9 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
-import java.time.LocalDateTime
 
 @DataJpaTest
-@Import(QRValidationService::class, QRCodeService::class)
+@Import(QRValidationService::class, QRCodeService::class, TimeConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("QRValidation - Integration Tests (полный цикл)")
 class QRValidationIntegrationTest {
@@ -203,18 +202,13 @@ class QRValidationIntegrationTest {
     @Test
     @DisplayName("Отклонение при отсутствии разрешения в табеле")
     fun `should reject when no permission in roster`() {
-        // Given - убираем разрешение на обед
-        permissionRepository.deleteAll()
-        permissionRepository.save(
-            MealPermissionEntity(
-                date = LocalDate.now(),
-                student = student,
-                assignedBy = curator,
-                reason = "Только завтрак",
-                isBreakfastAllowed = true,
-                isLunchAllowed = false,
-            )
-        )
+        // Given - убираем разрешение на обед у уже созданной записи
+        val currentPermission = permissionRepository.findByStudentAndDate(student, LocalDate.now())
+            ?: error("Expected permission for current day")
+        currentPermission.isBreakfastAllowed = true
+        currentPermission.isLunchAllowed = false
+        currentPermission.reason = "Только завтрак"
+        permissionRepository.save(currentPermission)
 
         // студент пытается получить обед
         val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
@@ -254,33 +248,6 @@ class QRValidationIntegrationTest {
         // First validation - success
         val response1 = qrValidationService.validateOnline(request)
         assertTrue(response1.isValid)
-
-        // Сохраняем транзакцию вручную (как это сделает повар)
-        val chef = userRepository.save(
-            UserEntity(
-                login = "chef",
-                passwordHash = "hash",
-                roles = mutableSetOf(Role.CHEF),
-                name = "Повар",
-                surname = "Кулинаров",
-                fatherName = "Поварович"
-            )
-        )
-
-        val txHash = qrCodeService.generateTransactionHash(
-            student.id.toString(), timestamp, MealType.LUNCH, nonce
-        )
-
-        transactionRepository.save(
-            MealTransactionEntity(
-                transactionHash = txHash,
-                timeStamp = LocalDateTime.now(),
-                student = student,
-                chef = chef,
-                isOffline = false,
-                mealType = MealType.LUNCH
-            )
-        )
 
         // When - попытка второго прохода (даже с новым QR!)
         val newNonce = CryptoUtils.generateNonce()

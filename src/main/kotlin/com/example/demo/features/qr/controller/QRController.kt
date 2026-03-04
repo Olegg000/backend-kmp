@@ -8,6 +8,7 @@ import com.example.demo.features.qr.service.QRValidationService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 
@@ -22,20 +23,20 @@ class QRController(
     @PostMapping("/validate")
     @PreAuthorize("hasAnyRole('CHEF', 'ADMIN')")
     @Operation(summary = "Проверить QR-код (онлайн)")
-    fun validateOnline(@RequestBody req: ValidateQRRequest): ValidateQRResponse {
+    fun validateOnline(@RequestBody @Valid req: ValidateQRRequest): ValidateQRResponse {
         return qrValidationService.validateOnline(req)
     }
 
     @PostMapping("/validate-offline")
     @Operation(summary = "Проверить QR-код (оффлайн, без JWT)")
-    fun validateOffline(@RequestBody req: ValidateQRRequest): ValidateQRResponse {
+    fun validateOffline(@RequestBody @Valid req: ValidateQRRequest): ValidateQRResponse {
         return qrValidationService.validateOffline(req)
     }
 
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('CHEF', 'ADMIN')")
     @Operation(summary = "Синхронизация оффлайн транзакций")
-    fun syncTransactions(@RequestBody transactions: List<OfflineTransactionDto>): SyncResponse {
+    fun syncTransactions(@RequestBody @Valid transactions: List<@Valid OfflineTransactionDto>): SyncResponse {
         return qrValidationService.syncOfflineTransactions(transactions)
     }
 }

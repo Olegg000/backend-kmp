@@ -16,6 +16,9 @@ spring:
         show_sql: true
         format_sql: true
 
+  flyway:
+    enabled: false
+
   # 🔥 КРИТИЧЕСКИ ВАЖНО: Отключаем data.sql для тестов
   sql:
     init:
@@ -37,3 +40,12 @@ logging:
     root: WARN
     com.example.demo: DEBUG
     org.springframework.security: WARN
+
+app:
+  business-zone: Europe/Samara
+
+security:
+  qr-offline-public: false
+  rate-limit:
+    enabled: false
+    use-forwarded-ip: false

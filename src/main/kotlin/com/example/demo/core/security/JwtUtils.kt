@@ -17,7 +17,7 @@ class JwtUtils(
     private val secret: SecretKey by lazy {
         Keys.hmacShaKeyFor(secretString.toByteArray())
     }
-    private val expirationMs = 86400000L // 24 часа
+    private val expirationMs = lifetime.coerceAtLeast(60_000L)
 
     fun generateToken(login: String, roles: Set<Role>): String {
         return Jwts.builder()

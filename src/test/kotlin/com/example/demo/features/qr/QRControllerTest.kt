@@ -95,8 +95,10 @@ class QRControllerTest {
     @DisplayName("POST /api/v1/qr/validate требует JWT токен")
     fun `validate endpoint requires authentication`() {
         // Given
+        val validNonce = "n".repeat(16)
+        val validSignature = "s".repeat(64)
         val request = ValidateQRRequest(
-            UUID.randomUUID(), 0L, MealType.LUNCH, "nonce", "signature"
+            UUID.randomUUID(), 0L, MealType.LUNCH, validNonce, validSignature
         )
 
         // When & Then
@@ -106,7 +108,7 @@ class QRControllerTest {
                 .content(objectMapper.writeValueAsString(request))
                 .with(csrf())
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isUnauthorized)
     }
 
     @Test
@@ -136,8 +138,8 @@ class QRControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/qr/validate-offline работает без токена")
-    fun `validate-offline endpoint works without token`() {
+    @DisplayName("POST /api/v1/qr/validate-offline требует роль повара по умолчанию")
+    fun `validate-offline endpoint requires chef token by default`() {
         // Given
         val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
         val nonce = CryptoUtils.generateNonce()
@@ -156,16 +158,39 @@ class QRControllerTest {
                 .content(objectMapper.writeValueAsString(request))
                 .with(csrf())
         )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.isValid").value(true))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/qr/validate-offline со студенческим токеном -> 403")
+    fun `validate-offline endpoint forbids student role`() {
+        val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
+        val nonce = CryptoUtils.generateNonce()
+        val signature = qrCodeService.generateSignature(
+            student.id.toString(), timestamp, MealType.LUNCH, nonce, privateKey
+        )
+        val request = ValidateQRRequest(
+            student.id!!, timestamp, MealType.LUNCH, nonce, signature
+        )
+
+        mockMvc.perform(
+            post("/api/v1/qr/validate-offline")
+                .header("Authorization", "Bearer $studentToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf())
+        )
+            .andExpect(status().isForbidden)
     }
 
     @Test
     @DisplayName("Студент НЕ может вызывать /validate (только повар)")
     fun `student cannot access validate endpoint`() {
         // Given
+        val validNonce = "n".repeat(16)
+        val validSignature = "s".repeat(64)
         val request = ValidateQRRequest(
-            student.id!!, 0L, MealType.LUNCH, "nonce", "signature"
+            student.id!!, 0L, MealType.LUNCH, validNonce, validSignature
         )
 
         // When & Then

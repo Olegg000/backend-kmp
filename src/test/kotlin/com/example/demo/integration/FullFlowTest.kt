@@ -3,6 +3,7 @@ package com.example.demo.integration
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.UserEntity
@@ -115,6 +116,7 @@ class FullFlowTest {
                 surname = "Студентов",
                 fatherName = "Петрович",
                 group = group,
+                studentCategory = StudentCategory.SVO,
                 publicKey = publicKey,
                 encryptedPrivateKey = privateKey
             )

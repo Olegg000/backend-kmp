@@ -5,18 +5,22 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.time.Clock
 
 @RestController
 @RequestMapping("/api/v1/time")
 @Tag(name = "Time Sync", description = "Синхронизация времени для оффлайн QR")
-class TimeSyncController {
+class TimeSyncController(
+    private val businessClock: Clock,
+) {
 
     @GetMapping("/current")
     @Operation(summary = "Получить текущее время сервера (Unix timestamp)")
     fun getCurrentTime(): TimeResponse {
+        val now = businessClock.instant()
         return TimeResponse(
-            timestamp = System.currentTimeMillis() / 1000, // Unix timestamp в секундах
-            iso8601 = java.time.Instant.now().toString()
+            timestamp = now.epochSecond,
+            iso8601 = now.toString()
         )
     }
 }

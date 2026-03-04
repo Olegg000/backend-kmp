@@ -1,6 +1,9 @@
 package com.example.demo.features.qr.dto
 
 import com.example.demo.core.database.MealType
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
+import jakarta.validation.constraints.Size
 import java.util.UUID
 
 /**
@@ -20,10 +23,21 @@ data class QRPayload(
  * Запрос на валидацию QR (повар сканирует)
  */
 data class ValidateQRRequest(
+    @field:NotNull
     val userId: UUID,
+
+    @field:NotNull
     val timestamp: Long,
+
+    @field:NotNull
     val mealType: MealType,
+
+    @field:NotBlank
+    @field:Size(min = 8, max = 160)
     val nonce: String,
+
+    @field:NotBlank
+    @field:Size(min = 32, max = 2048)
     val signature: String
 )
 

@@ -1,6 +1,7 @@
 package com.example.demo.features.student
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.config.TimeConfig
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.entity.GroupEntity
@@ -25,7 +26,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 
 @DataJpaTest
-@Import(StudentService::class, BCryptPasswordEncoder::class)
+@Import(StudentService::class, BCryptPasswordEncoder::class, TimeConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("StudentService - Consumption Tracking Tests")
 class StudentServiceTest {
@@ -142,11 +143,13 @@ class StudentServiceTest {
     @Test
     @DisplayName("Получение статуса питания: несколько приемов пищи использованы")
     fun `getTodayMeals should mark multiple meals as consumed`() {
+        val baseTs = LocalDate.now().atTime(12, 0)
+
         // Given - создаем транзакции завтрака и обеда
         transactionRepository.save(
             MealTransactionEntity(
                 transactionHash = "test-hash-breakfast",
-                timeStamp = LocalDateTime.now().minusHours(3),
+                timeStamp = baseTs.minusHours(3),
                 student = student,
                 chef = chef,
                 isOffline = false,
@@ -156,7 +159,7 @@ class StudentServiceTest {
         transactionRepository.save(
             MealTransactionEntity(
                 transactionHash = "test-hash-lunch",
-                timeStamp = LocalDateTime.now(),
+                timeStamp = baseTs,
                 student = student,
                 chef = chef,
                 isOffline = false,

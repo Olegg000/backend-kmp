@@ -1,6 +1,7 @@
 package com.example.demo.features.transactions
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.config.TimeConfig
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
@@ -24,10 +25,11 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.UUID
 
 @DataJpaTest
-@Import(TransactionsService::class)
+@Import(TransactionsService::class, TimeConfig::class)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("TransactionsService - Защита от двойного прохода")
 class TransactionsServiceTest {
@@ -162,6 +164,8 @@ class TransactionsServiceTest {
         // Then
         assertEquals(1, response.successCount, "Должна быть 1 успешная транзакция")
         assertTrue(response.errors.isEmpty(), "Не должно быть ошибок")
+        assertEquals(1, response.processed.size)
+        assertEquals("SUCCESS", response.processed.first().status)
 
         // Проверяем, что транзакция сохранена
         val saved = transactionRepository.findAll()
@@ -198,6 +202,8 @@ class TransactionsServiceTest {
         // Then
         assertEquals(0, response.successCount, "Не должно быть успешных транзакций")
         assertEquals(1, response.errors.size, "Должна быть 1 ошибка")
+        assertEquals(1, response.processed.size)
+        assertEquals("FAILED", response.processed.first().status)
         assertTrue(
             response.errors[0].contains("уже получил"),
             "Ошибка должна говорить о повторной попытке"
@@ -259,6 +265,53 @@ class TransactionsServiceTest {
     }
 
     @Test
+    @DisplayName("Синхронизация поддерживает timestampEpochSec без legacy timestamp")
+    fun `syncBatch should accept epoch timestamp`() {
+        val businessZone = ZoneId.of("Europe/Samara")
+        val mealDateTime = LocalDate.now(businessZone).atTime(12, 0)
+        val epoch = mealDateTime.atZone(businessZone).toEpochSecond()
+
+        val items = listOf(
+            TransactionSyncItem(
+                studentId = student.id!!,
+                mealType = MealType.LUNCH,
+                transactionHash = "epoch-only-hash",
+                timestamp = null,
+                timestampEpochSec = epoch,
+            )
+        )
+
+        val response = transactionsService.syncBatch(chef.login, items)
+
+        assertEquals(1, response.successCount, "Epoch-based timestamp должен успешно обрабатываться")
+        assertTrue(response.errors.isEmpty())
+    }
+
+    @Test
+    @DisplayName("timestampEpochSec имеет приоритет над legacy timestamp")
+    fun `syncBatch should prioritize epoch timestamp over legacy`() {
+        val businessZone = ZoneId.of("Europe/Samara")
+        val today = LocalDate.now(businessZone).atTime(13, 0)
+        val yesterday = today.minusDays(1)
+        val epochToday = today.atZone(businessZone).toEpochSecond()
+
+        val items = listOf(
+            TransactionSyncItem(
+                studentId = student.id!!,
+                mealType = MealType.LUNCH,
+                transactionHash = "epoch-priority-hash",
+                timestamp = yesterday, // Для вчера нет разрешения в табеле
+                timestampEpochSec = epochToday, // Для сегодня разрешение есть
+            )
+        )
+
+        val response = transactionsService.syncBatch(chef.login, items)
+
+        assertEquals(1, response.successCount, "При наличии epoch поле legacy должно игнорироваться")
+        assertTrue(response.errors.isEmpty())
+    }
+
+    @Test
     @DisplayName("Обработка пакета с несколькими студентами")
     fun `syncBatch should handle multiple students`() {
         // Given - второй студент
@@ -287,8 +340,18 @@ class TransactionsServiceTest {
         )
 
         val items = listOf(
-            TransactionSyncItem(student.id!!, LocalDateTime.now(), MealType.LUNCH, "hash1"),
-            TransactionSyncItem(student2.id!!, LocalDateTime.now(), MealType.LUNCH, "hash2")
+            TransactionSyncItem(
+                studentId = student.id!!,
+                mealType = MealType.LUNCH,
+                transactionHash = "hash1",
+                timestamp = LocalDateTime.now(),
+            ),
+            TransactionSyncItem(
+                studentId = student2.id!!,
+                mealType = MealType.LUNCH,
+                transactionHash = "hash2",
+                timestamp = LocalDateTime.now(),
+            ),
         )
 
         // When
@@ -317,8 +380,18 @@ class TransactionsServiceTest {
         // У student2 НЕТ разрешения
 
         val items = listOf(
-            TransactionSyncItem(student.id!!, LocalDateTime.now(), MealType.LUNCH, "hash1"),
-            TransactionSyncItem(student2.id!!, LocalDateTime.now(), MealType.LUNCH, "hash2")
+            TransactionSyncItem(
+                studentId = student.id!!,
+                mealType = MealType.LUNCH,
+                transactionHash = "hash1",
+                timestamp = LocalDateTime.now(),
+            ),
+            TransactionSyncItem(
+                studentId = student2.id!!,
+                mealType = MealType.LUNCH,
+                transactionHash = "hash2",
+                timestamp = LocalDateTime.now(),
+            ),
         )
 
         // When
@@ -332,6 +405,8 @@ class TransactionsServiceTest {
     @Test
     @DisplayName("MANY_CHILDREN не может получить второй прием пищи в тот же день")
     fun `many children student cannot consume two meals in one day`() {
+        val baseTs = LocalDate.now().atTime(12, 0)
+
         student.studentCategory = StudentCategory.MANY_CHILDREN
         userRepository.save(student)
 
@@ -346,7 +421,7 @@ class TransactionsServiceTest {
             listOf(
                 TransactionSyncItem(
                     studentId = student.id!!,
-                    timestamp = LocalDateTime.now().minusHours(1),
+                    timestamp = baseTs.minusHours(1),
                     mealType = MealType.BREAKFAST,
                     transactionHash = "many-children-1"
                 )
@@ -359,7 +434,7 @@ class TransactionsServiceTest {
             listOf(
                 TransactionSyncItem(
                     studentId = student.id!!,
-                    timestamp = LocalDateTime.now(),
+                    timestamp = baseTs.plusHours(2),
                     mealType = MealType.LUNCH,
                     transactionHash = "many-children-2"
                 )

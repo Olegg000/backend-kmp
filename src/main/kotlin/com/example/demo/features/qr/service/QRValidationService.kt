@@ -5,16 +5,19 @@ import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.database.entity.MealTransactionEntity
 import com.example.demo.core.database.StudentCategory
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.qr.dto.QRValidationError
 import com.example.demo.features.qr.dto.ValidateQRRequest
 import com.example.demo.features.qr.dto.ValidateQRResponse
 import com.example.demo.features.qr.dto.OfflineTransactionDto
 import com.example.demo.features.qr.dto.SyncResponse
 import com.example.demo.features.qr.dto.SyncError
+import org.springframework.dao.DataIntegrityViolationException
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -27,7 +30,9 @@ class QRValidationService(
     private val qrCodeService: QRCodeService,
     private val userRepository: UserRepository,
     private val permissionRepository: MealPermissionRepository,
-    private val transactionRepository: MealTransactionRepository
+    private val transactionRepository: MealTransactionRepository,
+    private val businessZoneId: ZoneId,
+    private val businessClock: Clock,
 ) {
     private val logger = LoggerFactory.getLogger(QRValidationService::class.java)
 
@@ -46,11 +51,11 @@ class QRValidationService(
             return basicCheck
         }
 
-        val student = userRepository.findById(req.userId).getOrNull()
+        val student = userRepository.findByIdForUpdate(req.userId)
             ?: return createErrorResponse(QRValidationError.STUDENT_NOT_FOUND)
 
         // 2. Проверка Double Spending (БД) - главная защита
-        val date = LocalDate.now()
+        val date = LocalDate.now(businessClock)
         val startOfDay = date.atStartOfDay()
         val endOfDay = date.atTime(LocalTime.MAX)
 
@@ -113,20 +118,24 @@ class QRValidationService(
                 "Повар не найден"
             )
 
-        val timestamp = LocalDateTime.ofInstant(
-            Instant.ofEpochSecond(req.timestamp),
-            ZoneId.systemDefault()
-        )
-        transactionRepository.save(
-            MealTransactionEntity(
-                transactionHash = txHash,
-                timeStamp = timestamp,
-                student = student,
-                chef = chef,
-                isOffline = false,
-                mealType = req.mealType
+        val timestamp = LocalDateTime.ofInstant(Instant.ofEpochSecond(req.timestamp), businessZoneId)
+        try {
+            transactionRepository.save(
+                MealTransactionEntity(
+                    transactionHash = txHash,
+                    timeStamp = timestamp,
+                    student = student,
+                    chef = chef,
+                    isOffline = false,
+                    mealType = req.mealType
+                )
             )
-        )
+        } catch (_: DataIntegrityViolationException) {
+            return createErrorResponse(
+                QRValidationError.ALREADY_USED,
+                "${student.surname} ${student.name}"
+            )
+        }
 
         logger.info("Validation successful for ${student.login}")
         return ValidateQRResponse(
@@ -156,7 +165,7 @@ class QRValidationService(
         transactions.forEach { tx ->
             try {
                 // 1. Поиск студента
-                val student = userRepository.findById(java.util.UUID.fromString(tx.userId)).getOrNull()
+                val student = userRepository.findByIdForUpdate(java.util.UUID.fromString(tx.userId))
                 if (student == null) {
                     failedCount++
                     errors.add(SyncError(tx.userId, "Студент не найден"))
@@ -193,7 +202,7 @@ class QRValidationService(
                 // 4. Сохранение
                 val timestamp = LocalDateTime.ofInstant(
                     Instant.ofEpochSecond(tx.timestamp),
-                    ZoneId.systemDefault()
+                    businessZoneId
                 )
                 val dateOfMeal = timestamp.toLocalDate()
                 val startOfDay = dateOfMeal.atStartOfDay()
@@ -235,22 +244,37 @@ class QRValidationService(
                     return@forEach
                 }
                 
-                transactionRepository.save(
-                    MealTransactionEntity(
-                        transactionHash = txHash,
-                        timeStamp = timestamp,
-                        student = student,
-                        chef = chef,
-                        isOffline = true,
-                        mealType = tx.mealType
+                try {
+                    transactionRepository.save(
+                        MealTransactionEntity(
+                            transactionHash = txHash,
+                            timeStamp = timestamp,
+                            student = student,
+                            chef = chef,
+                            isOffline = true,
+                            mealType = tx.mealType
+                        )
                     )
-                )
+                } catch (_: DataIntegrityViolationException) {
+                    if (transactionRepository.existsByTransactionHash(txHash)) {
+                        successCount++
+                        return@forEach
+                    }
+                    throw BusinessException(
+                        code = "TRANSACTION_CONFLICT",
+                        userMessage = "Конфликт сохранения транзакции",
+                    )
+                }
                 successCount++
 
             } catch (e: Exception) {
                 logger.error("Error syncing transaction for user ${tx.userId}", e)
                 failedCount++
-                errors.add(SyncError(tx.userId, "Внутренняя ошибка: ${e.message}"))
+                val safeMessage = when (e) {
+                    is BusinessException -> e.userMessage
+                    else -> "Не удалось синхронизировать транзакцию"
+                }
+                errors.add(SyncError(tx.userId, safeMessage))
             }
         }
 
@@ -273,7 +297,7 @@ class QRValidationService(
     private fun performBasicValidation(req: ValidateQRRequest): ValidateQRResponse {
         // 1. Проверка времени (±60 секунд от текущего момента)
         if (!qrCodeService.isTimestampValid(req.timestamp)) {
-            val now = System.currentTimeMillis() / 1000
+            val now = businessClock.instant().epochSecond
             val diff = kotlin.math.abs(now - req.timestamp)
             logger.warn("Timestamp validation failed. Diff: ${diff}s")
             return createErrorResponse(QRValidationError.EXPIRED)

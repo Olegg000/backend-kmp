@@ -8,6 +8,7 @@ import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.PasswordResetLogRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.core.security.JwtUtils
 import com.example.demo.core.util.CryptoUtils
 import com.example.demo.core.util.PasswordGenerator
@@ -21,6 +22,7 @@ import com.example.demo.features.auth.dto.RegistrationDto
 import com.example.demo.features.auth.dto.UserCredentialsResponse
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -46,7 +48,11 @@ class UserServiceQ(
 
     fun reg(regDto: RegUser) {
         if (userRepository.findByLogin(regDto.login) != null) {
-            throw RuntimeException("Пользователь уже существует")
+            throw BusinessException(
+                code = "USER_ALREADY_EXISTS",
+                userMessage = "Пользователь уже существует",
+                status = HttpStatus.CONFLICT,
+            )
         }
 
         val user = UserEntity(
@@ -69,7 +75,11 @@ class UserServiceQ(
 
         // 2. Достаем пользователя
         val user = userRepository.findByLogin(request.login)
-            ?: throw RuntimeException("Пользователь не найден") // В реальности не случится, если authenticate прошел
+            ?: throw BusinessException(
+                code = "AUTH_USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.UNAUTHORIZED,
+            )
 
         // 3. ПРОВЕРКА КЛЮЧЕЙ (Фишка твоего проекта)
         // Если пользователь зашел первый раз или у него нет ключей - генерируем
@@ -106,7 +116,11 @@ class UserServiceQ(
     @Transactional
     fun getMyKeys(login: String): com.example.demo.features.auth.dto.AuthKeysDto {
         val user = userRepository.findByLogin(login)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
             
         // Если ключей почему-то нет (хотя создаются при первом входе), можно генерировать
         if (user.publicKey == null || user.encryptedPrivateKey == null) {
@@ -125,10 +139,22 @@ class UserServiceQ(
     @Transactional(readOnly = true)
     fun getMyProfile(login: String): com.example.demo.features.auth.dto.AuthMeResponse {
         val user = userRepository.findByLogin(login)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
-        val publicKey = user.publicKey ?: throw RuntimeException("Публичный ключ пользователя отсутствует")
-        val privateKey = user.encryptedPrivateKey ?: throw RuntimeException("Приватный ключ пользователя отсутствует")
+        val publicKey = user.publicKey ?: throw BusinessException(
+            code = "PUBLIC_KEY_MISSING",
+            userMessage = "Публичный ключ пользователя отсутствует",
+            status = HttpStatus.CONFLICT,
+        )
+        val privateKey = user.encryptedPrivateKey ?: throw BusinessException(
+            code = "PRIVATE_KEY_MISSING",
+            userMessage = "Приватный ключ пользователя отсутствует",
+            status = HttpStatus.CONFLICT,
+        )
 
         return com.example.demo.features.auth.dto.AuthMeResponse(
             userId = user.id!!,
@@ -147,14 +173,24 @@ class UserServiceQ(
     fun registerUser(dto: RegistrationDto) {
         // 1. Валидация: занят ли логин?
         if (userRepository.findByLogin(dto.login) != null) {
-            throw RuntimeException("Пользователь с логином ${dto.login} уже существует")
+            throw BusinessException(
+                code = "USER_ALREADY_EXISTS",
+                userMessage = "Пользователь с логином ${dto.login} уже существует",
+                status = HttpStatus.CONFLICT,
+            )
         }
 
         // 2. Поиск группы (если указана)
         var groupEntity: GroupEntity? = null
         if (dto.groupId != null) {
             groupEntity = groupRepository.findById(dto.groupId)
-                .orElseThrow { RuntimeException("Группа не найдена") }
+                .orElseThrow {
+                    BusinessException(
+                        code = "GROUP_NOT_FOUND",
+                        userMessage = "Группа не найдена",
+                        status = HttpStatus.NOT_FOUND,
+                    )
+                }
         }
         validateStudentFields(dto.roles, dto.studentCategory)
 
@@ -175,7 +211,12 @@ class UserServiceQ(
 
     @Transactional
     fun createUserAuto(req: CreateUserRequest): UserCredentialsResponse {
-        if (req.roles.isEmpty()) throw RuntimeException("Нужна хотя бы одна роль!")
+        if (req.roles.isEmpty()) {
+            throw BusinessException(
+                code = "ROLES_REQUIRED",
+                userMessage = "Нужна хотя бы одна роль",
+            )
+        }
 
         // 1. Определяем префикс логина по приоритету
         val loginPrefix = when {
@@ -195,7 +236,11 @@ class UserServiceQ(
         var groupEntity: GroupEntity? = null
         if (req.groupId != null) {
             groupEntity = groupRepository.findByIdOrNull(req.groupId)
-                ?: throw RuntimeException("Группа не найдена")
+                ?: throw BusinessException(
+                    code = "GROUP_NOT_FOUND",
+                    userMessage = "Группа не найдена",
+                    status = HttpStatus.NOT_FOUND,
+                )
         }
         validateStudentFields(req.roles, req.studentCategory)
 
@@ -223,14 +268,23 @@ class UserServiceQ(
     @Transactional
     fun resetPassword(userId: UUID, requestedByLogin: String? = null): UserCredentialsResponse {
         val user = userRepository.findByIdOrNull(userId)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         val now = LocalDateTime.now()
         val start = now.minusDays(1)
 
         val resetCount = passwordResetLogRepository.countByUserAndTimestampBetween(user, start, now)
         if (resetCount >= 3) {
-            throw RuntimeException("Слишком много попыток сброса пароля за последние 24 часа")
+            throw BusinessException(
+                code = "PASSWORD_RESET_LIMIT_EXCEEDED",
+                userMessage = "Слишком много попыток сброса пароля за последние 24 часа",
+                status = HttpStatus.TOO_MANY_REQUESTS,
+                retryable = true,
+            )
         }
 
         val newPassword = passwordGenerator.generatePassword(8)
@@ -275,7 +329,11 @@ class UserServiceQ(
 
                 // Ищем или создаем группу (если политика позволяет)
                 val group = groupRepository.findByGroupName(groupName)
-                    ?: throw RuntimeException("Группа $groupName не найдена. Создайте её сначала.")
+                    ?: throw BusinessException(
+                        code = "GROUP_NOT_FOUND",
+                        userMessage = "Группа $groupName не найдена. Создайте её сначала.",
+                        status = HttpStatus.NOT_FOUND,
+                    )
 
                 // Создаем запрос на авто-создание
                 val req = CreateUserRequest(
@@ -300,11 +358,17 @@ class UserServiceQ(
         studentCategory: StudentCategory? = null,
     ): AdminUserDto {
         if (newRoles.isEmpty()) {
-            throw RuntimeException("Пользователь должен иметь хотя бы одну роль")
+            throw BusinessException(
+                code = "ROLES_REQUIRED",
+                userMessage = "Пользователь должен иметь хотя бы одну роль",
+            )
         }
 
         val user = userRepository.findByIdOrNull(userId)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+            )
 
         val hadStudentRole = user.roles.contains(Role.STUDENT)
         val hasStudentRole = newRoles.contains(Role.STUDENT)
@@ -315,12 +379,21 @@ class UserServiceQ(
         } else {
             if (groupId != null) {
                 user.group = groupRepository.findByIdOrNull(groupId)
-                    ?: throw RuntimeException("Группа не найдена")
+                    ?: throw BusinessException(
+                        code = "GROUP_NOT_FOUND",
+                        userMessage = "Группа не найдена",
+                    )
             } else if (!hadStudentRole) {
-                throw RuntimeException("Для роли STUDENT нужно выбрать группу")
+                throw BusinessException(
+                    code = "STUDENT_GROUP_REQUIRED",
+                    userMessage = "Для роли STUDENT нужно выбрать группу",
+                )
             }
             if (!hadStudentRole && studentCategory == null) {
-                throw RuntimeException("Для роли STUDENT нужно выбрать категорию")
+                throw BusinessException(
+                    code = "STUDENT_CATEGORY_REQUIRED",
+                    userMessage = "Для роли STUDENT нужно выбрать категорию",
+                )
             }
             if (studentCategory != null) {
                 user.studentCategory = studentCategory
@@ -343,9 +416,15 @@ class UserServiceQ(
     @Transactional
     fun updateStudentCategory(userId: UUID, category: StudentCategory): AdminUserDto {
         val user = userRepository.findByIdOrNull(userId)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+            )
         if (!user.roles.contains(Role.STUDENT)) {
-            throw RuntimeException("Категорию можно менять только студенту")
+            throw BusinessException(
+                code = "CATEGORY_ONLY_FOR_STUDENT",
+                userMessage = "Категорию можно менять только студенту",
+            )
         }
         user.studentCategory = category
         val saved = userRepository.save(user)
@@ -364,10 +443,18 @@ class UserServiceQ(
     @Transactional
     fun deleteUser(userId: UUID, currentLogin: String) {
         val user = userRepository.findByIdOrNull(userId)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         if (user.login == currentLogin) {
-            throw RuntimeException("Нельзя удалить самого себя")
+            throw BusinessException(
+                code = "SELF_DELETE_FORBIDDEN",
+                userMessage = "Нельзя удалить самого себя",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
 
         userRepository.delete(user)
@@ -413,7 +500,12 @@ class UserServiceQ(
         category: StudentCategory?
     ) {
         if (roles.contains(Role.STUDENT)) return
-        if (category != null) throw RuntimeException("Категорию можно задавать только студенту")
+        if (category != null) {
+            throw BusinessException(
+                code = "CATEGORY_ONLY_FOR_STUDENT",
+                userMessage = "Категорию можно задавать только студенту",
+            )
+        }
     }
 
 }

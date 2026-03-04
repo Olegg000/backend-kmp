@@ -6,6 +6,7 @@ import com.example.demo.features.transactions.service.TransactionsService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 import java.security.Principal
@@ -22,7 +23,7 @@ class TransactionController(
     @PreAuthorize("hasAnyRole('CHEF', 'ADMIN')")
     @Operation(summary = "Загрузить пачку транзакций (Синхронизация)")
     fun syncBatch(
-        @RequestBody items: List<TransactionSyncItem>,
+        @RequestBody @Valid items: List<@Valid TransactionSyncItem>,
         principal: Principal // Получаем логин того, кто отправил
     ): SyncResponse {
         return transactionService.syncBatch(principal.name, items)
