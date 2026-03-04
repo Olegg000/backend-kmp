@@ -9,9 +9,12 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.logging.maskLogin
+import com.example.demo.core.logging.maskUuid
 import com.example.demo.features.reports.dto.AssignedByRole
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.dto.ConsumptionReportRow
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
@@ -24,6 +27,7 @@ class ReportsService(
     private val permissionRepository: MealPermissionRepository,
     private val transactionRepository: MealTransactionRepository
 ) {
+    private val logger = LoggerFactory.getLogger(ReportsService::class.java)
 
     fun generateConsumptionReport(
         currentLogin: String,
@@ -32,90 +36,144 @@ class ReportsService(
         groupId: Int?,
         assignedByRoleFilter: AssignedByRoleFilter
     ): List<ConsumptionReportRow> {
-        if (endDate.isBefore(startDate)) {
-            throw RuntimeException("Дата окончания не может быть раньше даты начала")
-        }
-
-        val currentUser = userRepository.findByLogin(currentLogin)
-            ?: throw RuntimeException("Пользователь не найден")
-        val groups = resolveAccessibleGroups(currentUser.roles, currentUser.id, groupId)
-        if (groups.isEmpty()) return emptyList()
-
-        val dates = buildDateRange(startDate, endDate)
-        val studentsByGroup = groups.associateWith { group ->
-            userRepository.findAllByGroup(group)
-                .asSequence()
-                .filter { it.roles.contains(Role.STUDENT) }
-                .sortedWith(compareBy({ it.surname }, { it.name }, { it.fatherName }))
-                .toList()
-        }
-
-        val permissions = permissionRepository.findAllByGroupsAndDateRange(groups, startDate, endDate)
-        val permissionByStudentDate = mutableMapOf<StudentDateKey, com.example.demo.core.database.entity.MealPermissionEntity>()
-        permissions.forEach { permission ->
-            val studentId = permission.student.id ?: return@forEach
-            val key = StudentDateKey(studentId, permission.date)
-            val previous = permissionByStudentDate[key]
-            if (previous == null || (permission.id ?: Int.MIN_VALUE) > (previous.id ?: Int.MIN_VALUE)) {
-                permissionByStudentDate[key] = permission
+        val loginMasked = maskLogin(currentLogin)
+        var currentUserId: UUID? = null
+        try {
+            if (endDate.isBefore(startDate)) {
+                throw RuntimeException("Дата окончания не может быть раньше даты начала")
             }
-        }
 
-        val transactions = transactionRepository.findAllByStudentGroupInAndTimeStampBetween(
-            groups = groups,
-            start = startDate.atStartOfDay(),
-            end = endDate.atTime(LocalTime.MAX)
-        )
-        val transactionByStudentDateMeal = mutableMapOf<StudentDateMealKey, MealTransactionEntity>()
-        transactions.forEach { transaction ->
-            val studentId = transaction.student.id ?: return@forEach
-            val key = StudentDateMealKey(studentId, transaction.timeStamp.toLocalDate(), transaction.mealType)
-            val previous = transactionByStudentDateMeal[key]
-            if (previous == null || isNewerTransaction(transaction, previous)) {
-                transactionByStudentDateMeal[key] = transaction
+            val currentUser = userRepository.findByLogin(currentLogin)
+                ?: throw RuntimeException("Пользователь не найден")
+            currentUserId = currentUser.id
+            logger.info(
+                "Preparing consumption report: loginMasked={}, userIdMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRoleFilter={}",
+                loginMasked,
+                maskUuid(currentUserId),
+                currentUser.roles.sortedBy { it.name }.joinToString(","),
+                startDate,
+                endDate,
+                groupId,
+                assignedByRoleFilter
+            )
+
+            val groups = resolveAccessibleGroups(currentUser.roles, currentUser.id, groupId)
+            logger.info(
+                "Resolved accessible groups for report: loginMasked={}, groupsCount={}, groupIds={}",
+                loginMasked,
+                groups.size,
+                groups.mapNotNull { it.id }.sorted().joinToString(",")
+            )
+            if (groups.isEmpty()) {
+                logger.info("No accessible groups for report: loginMasked={}, groupId={}", loginMasked, groupId)
+                return emptyList()
             }
-        }
 
-        val rows = mutableListOf<ConsumptionReportRow>()
-        groups.forEach { group ->
-            val groupIdValue = group.id ?: throw RuntimeException("У группы отсутствует id")
-            studentsByGroup[group].orEmpty().forEach { student ->
-                val studentId = student.id ?: throw RuntimeException("У студента отсутствует id")
-                val studentName = fullName(student.surname, student.name, student.fatherName)
-                for (date in dates) {
-                    val permission = permissionByStudentDate[StudentDateKey(studentId, date)]
-                    val assignedByRole = permission?.let(::resolveAssignedByRole)
-                    if (assignedByRoleFilter == AssignedByRoleFilter.ADMIN && assignedByRole != AssignedByRole.ADMIN) continue
-                    if (assignedByRoleFilter == AssignedByRoleFilter.CURATOR && assignedByRole != AssignedByRole.CURATOR) continue
+            val dates = buildDateRange(startDate, endDate)
+            val studentsByGroup = groups.associateWith { group ->
+                userRepository.findAllByGroup(group)
+                    .asSequence()
+                    .filter { it.roles.contains(Role.STUDENT) }
+                    .sortedWith(compareBy({ it.surname }, { it.name }, { it.fatherName }))
+                    .toList()
+            }
+            val studentsCount = studentsByGroup.values.sumOf { it.size }
+            logger.info(
+                "Loaded students for report: loginMasked={}, groupsCount={}, studentsCount={}",
+                loginMasked,
+                groups.size,
+                studentsCount
+            )
 
-                    val breakfastTx = transactionByStudentDateMeal[
-                        StudentDateMealKey(studentId, date, MealType.BREAKFAST)
-                    ]
-                    val lunchTx = transactionByStudentDateMeal[
-                        StudentDateMealKey(studentId, date, MealType.LUNCH)
-                    ]
-
-                    rows += ConsumptionReportRow(
-                        date = date,
-                        groupId = groupIdValue,
-                        groupName = group.groupName,
-                        studentId = studentId,
-                        studentName = studentName,
-                        category = student.studentCategory,
-                        assignedByRole = assignedByRole,
-                        assignedByName = permission?.assignedBy?.let { fullName(it.surname, it.name, it.fatherName) },
-                        breakfastUsed = breakfastTx != null,
-                        breakfastTransactionId = breakfastTx?.id,
-                        breakfastScannedByName = breakfastTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) },
-                        lunchUsed = lunchTx != null,
-                        lunchTransactionId = lunchTx?.id,
-                        lunchScannedByName = lunchTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) }
-                    )
+            val permissions = permissionRepository.findAllByGroupsAndDateRange(groups, startDate, endDate)
+            logger.info("Loaded meal permissions for report: loginMasked={}, permissionsCount={}", loginMasked, permissions.size)
+            val permissionByStudentDate = mutableMapOf<StudentDateKey, com.example.demo.core.database.entity.MealPermissionEntity>()
+            permissions.forEach { permission ->
+                val studentId = permission.student.id ?: return@forEach
+                val key = StudentDateKey(studentId, permission.date)
+                val previous = permissionByStudentDate[key]
+                if (previous == null || (permission.id ?: Int.MIN_VALUE) > (previous.id ?: Int.MIN_VALUE)) {
+                    permissionByStudentDate[key] = permission
                 }
             }
-        }
 
-        return rows.sortedWith(compareBy({ it.date }, { it.groupName }, { it.studentName }))
+            val transactions = transactionRepository.findAllByStudentGroupInAndTimeStampBetween(
+                groups = groups,
+                start = startDate.atStartOfDay(),
+                end = endDate.atTime(LocalTime.MAX)
+            )
+            logger.info("Loaded meal transactions for report: loginMasked={}, transactionsCount={}", loginMasked, transactions.size)
+            val transactionByStudentDateMeal = mutableMapOf<StudentDateMealKey, MealTransactionEntity>()
+            transactions.forEach { transaction ->
+                val studentId = transaction.student.id ?: return@forEach
+                val key = StudentDateMealKey(studentId, transaction.timeStamp.toLocalDate(), transaction.mealType)
+                val previous = transactionByStudentDateMeal[key]
+                if (previous == null || isNewerTransaction(transaction, previous)) {
+                    transactionByStudentDateMeal[key] = transaction
+                }
+            }
+
+            val rows = mutableListOf<ConsumptionReportRow>()
+            groups.forEach { group ->
+                val groupIdValue = group.id ?: throw RuntimeException("У группы отсутствует id")
+                studentsByGroup[group].orEmpty().forEach { student ->
+                    val studentId = student.id ?: throw RuntimeException("У студента отсутствует id")
+                    val studentName = fullName(student.surname, student.name, student.fatherName)
+                    for (date in dates) {
+                        val permission = permissionByStudentDate[StudentDateKey(studentId, date)]
+                        val assignedByRole = permission?.let(::resolveAssignedByRole)
+                        if (assignedByRoleFilter == AssignedByRoleFilter.ADMIN && assignedByRole != AssignedByRole.ADMIN) continue
+                        if (assignedByRoleFilter == AssignedByRoleFilter.CURATOR && assignedByRole != AssignedByRole.CURATOR) continue
+
+                        val breakfastTx = transactionByStudentDateMeal[
+                            StudentDateMealKey(studentId, date, MealType.BREAKFAST)
+                        ]
+                        val lunchTx = transactionByStudentDateMeal[
+                            StudentDateMealKey(studentId, date, MealType.LUNCH)
+                        ]
+
+                        rows += ConsumptionReportRow(
+                            date = date,
+                            groupId = groupIdValue,
+                            groupName = group.groupName,
+                            studentId = studentId,
+                            studentName = studentName,
+                            category = student.studentCategory,
+                            assignedByRole = assignedByRole,
+                            assignedByName = permission?.assignedBy?.let { fullName(it.surname, it.name, it.fatherName) },
+                            breakfastUsed = breakfastTx != null,
+                            breakfastTransactionId = breakfastTx?.id,
+                            breakfastScannedByName = breakfastTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) },
+                            lunchUsed = lunchTx != null,
+                            lunchTransactionId = lunchTx?.id,
+                            lunchScannedByName = lunchTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) }
+                        )
+                    }
+                }
+            }
+
+            val sortedRows = rows.sortedWith(compareBy({ it.date }, { it.groupName }, { it.studentName }))
+            logger.info(
+                "Consumption report prepared: loginMasked={}, userIdMasked={}, rowsCount={}",
+                loginMasked,
+                maskUuid(currentUserId),
+                sortedRows.size
+            )
+            return sortedRows
+        } catch (e: Exception) {
+            logger.error(
+                "Failed to generate consumption report: loginMasked={}, userIdMasked={}, startDate={}, endDate={}, groupId={}, assignedByRoleFilter={}, exceptionClass={}",
+                loginMasked,
+                maskUuid(currentUserId),
+                startDate,
+                endDate,
+                groupId,
+                assignedByRoleFilter,
+                e::class.java.simpleName,
+                e
+            )
+            throw e
+        }
     }
 
     fun exportToCsv(

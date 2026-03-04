@@ -1,5 +1,6 @@
 package com.example.demo.config
 
+import com.example.demo.core.logging.RequestCorrelationFilter
 import com.example.demo.core.security.JwtFilter
 import com.example.demo.core.security.RateLimitFilter
 import org.springframework.beans.factory.annotation.Value
@@ -24,6 +25,7 @@ import org.springframework.http.HttpMethod
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 class SecurityConfig(
+    private val requestCorrelationFilter: RequestCorrelationFilter,
     private val jwtFilter: JwtFilter,
     private val rateLimitFilter: RateLimitFilter,
     @Value("\${security.qr-offline-public:false}")
@@ -72,8 +74,9 @@ class SecurityConfig(
 
                 auth.anyRequest().authenticated()
             }
-            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter::class.java)
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(requestCorrelationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterAfter(rateLimitFilter, RequestCorrelationFilter::class.java)
+            .addFilterAfter(jwtFilter, RateLimitFilter::class.java)
 
         return http.build()
     }
