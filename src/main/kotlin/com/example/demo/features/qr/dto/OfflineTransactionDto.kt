@@ -33,5 +33,6 @@ data class SyncResponse(
 
 data class SyncError(
     val userId: String,
-    val reason: String
+    val reason: String,
+    val transactionHash: String? = null,
 )

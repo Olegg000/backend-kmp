@@ -126,8 +126,8 @@ class TransactionsControllerTest(
     }
 
     @Test
-    @DisplayName("POST batch с токеном повара → 200 и successCount как ожидается")
-    fun `batch with chef token should sync successfully`() {
+    @DisplayName("POST batch с токеном повара → 410 + BATCH_SYNC_DISABLED")
+    fun `batch with chef token should return gone`() {
         val (chefToken, _, student) = setupChefAndStudent()
 
         val items = listOf(
@@ -145,11 +145,9 @@ class TransactionsControllerTest(
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(items))
         )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.successCount").value(1))
-            .andExpect(jsonPath("$.errors").isArray)
-            .andExpect(jsonPath("$.processed.length()").value(1))
-            .andExpect(jsonPath("$.processed[0].status").value("SUCCESS"))
+            .andExpect(status().isGone)
+            .andExpect(jsonPath("$.code").value("BATCH_SYNC_DISABLED"))
+            .andExpect(jsonPath("$.status").value(410))
     }
 
     @Test

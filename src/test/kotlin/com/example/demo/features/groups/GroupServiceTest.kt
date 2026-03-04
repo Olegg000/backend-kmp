@@ -153,6 +153,27 @@ class GroupServiceTest(
     }
 
     @Test
+    @DisplayName("Назначение куратора с ролью ADMIN без CURATOR должно падать")
+    fun `setCurator with ADMIN role only should fail`() {
+        val adminOnly = userRepository.save(
+            UserEntity(
+                login = "admin-only-curator",
+                passwordHash = "h",
+                roles = mutableSetOf(Role.ADMIN),
+                name = "Админ",
+                surname = "БезКуратора",
+                fatherName = "Тестович"
+            )
+        )
+
+        val ex = assertThrows(BusinessException::class.java) {
+            groupService.addCurator(group.id!!, adminOnly.id!!)
+        }
+        assertEquals("USER_NOT_CURATOR", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
+    }
+
+    @Test
     @DisplayName("Назначение куратора с ролью STUDENT должно падать")
     fun `setCurator with STUDENT role should fail`() {
         val notCurator = userRepository.save(
@@ -166,10 +187,11 @@ class GroupServiceTest(
             )
         )
 
-        val ex = assertThrows(RuntimeException::class.java) {
+        val ex = assertThrows(BusinessException::class.java) {
             groupService.addCurator(group.id!!, notCurator.id!!)
         }
-        assertTrue(ex.message!!.contains("не имеет роли CURATOR"))
+        assertEquals("USER_NOT_CURATOR", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
     }
 
     @Test
@@ -206,10 +228,11 @@ class GroupServiceTest(
             )
         )
 
-        val ex = assertThrows(RuntimeException::class.java) {
+        val ex = assertThrows(BusinessException::class.java) {
             groupService.addStudentToGroup(group.id!!, chef.id!!)
         }
-        assertTrue(ex.message!!.contains("Можно добавлять только студентов"))
+        assertEquals("ONLY_STUDENT_CAN_BE_ASSIGNED_TO_GROUP", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
     }
 
     @Test

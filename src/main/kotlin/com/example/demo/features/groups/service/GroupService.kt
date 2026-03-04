@@ -64,15 +64,26 @@ class GroupService(
     @Transactional
     fun addCurator(groupId: Int, curatorId: UUID): GroupResponse {
         val group = groupRepository.findByIdOrNull(groupId)
-            ?: throw RuntimeException("Группа не найдена")
+            ?: throw BusinessException(
+                code = "GROUP_NOT_FOUND",
+                userMessage = "Группа не найдена",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         val user = userRepository.findByIdOrNull(curatorId)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
-        // Валидация: А точно ли это куратор?
-        // Валидация: должен быть CURATOR или ADMIN (допустимы комбинированные роли)
-        if (!user.roles.contains(Role.CURATOR) && !user.roles.contains(Role.ADMIN)) {
-            throw RuntimeException("Пользователь не имеет роли CURATOR")
+        // Куратором группы может быть только пользователь с ролью CURATOR.
+        if (!user.roles.contains(Role.CURATOR)) {
+            throw BusinessException(
+                code = "USER_NOT_CURATOR",
+                userMessage = "Назначить куратором можно только пользователя с ролью CURATOR.",
+                status = HttpStatus.BAD_REQUEST,
+            )
         }
 
         group.curators.add(user)
@@ -83,10 +94,18 @@ class GroupService(
     @Transactional
     fun removeCurator(groupId: Int, curatorId: UUID): GroupResponse {
         val group = groupRepository.findByIdOrNull(groupId)
-            ?: throw RuntimeException("Группа не найдена")
+            ?: throw BusinessException(
+                code = "GROUP_NOT_FOUND",
+                userMessage = "Группа не найдена",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         val user = userRepository.findByIdOrNull(curatorId)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         group.curators.remove(user)
         return toGroupResponse(groupRepository.save(group))
@@ -96,14 +115,26 @@ class GroupService(
     @Transactional
     fun addStudentToGroup(groupId: Int, studentId: UUID) {
         val group = groupRepository.findByIdOrNull(groupId)
-            ?: throw RuntimeException("Группа не найдена")
+            ?: throw BusinessException(
+                code = "GROUP_NOT_FOUND",
+                userMessage = "Группа не найдена",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         val student = userRepository.findByIdOrNull(studentId)
-            ?: throw RuntimeException("Студент не найден")
+            ?: throw BusinessException(
+                code = "STUDENT_NOT_FOUND",
+                userMessage = "Студент не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         // Должна быть роль STUDENT (может быть в комбинации с другими)
         if (!student.roles.contains(Role.STUDENT)) {
-            throw RuntimeException("Можно добавлять только студентов")
+            throw BusinessException(
+                code = "ONLY_STUDENT_CAN_BE_ASSIGNED_TO_GROUP",
+                userMessage = "Можно добавлять только студентов",
+                status = HttpStatus.BAD_REQUEST,
+            )
         }
 
         student.group = group // Меняем поле в UserEntity
@@ -114,7 +145,11 @@ class GroupService(
     @Transactional
     fun removeStudentFromGroup(studentId: UUID) {
         val student = userRepository.findByIdOrNull(studentId)
-            ?: throw RuntimeException("Студент не найден")
+            ?: throw BusinessException(
+                code = "STUDENT_NOT_FOUND",
+                userMessage = "Студент не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         student.group = null
         userRepository.save(student)
@@ -124,7 +159,11 @@ class GroupService(
     @Transactional
     fun deleteGroup(groupId: Int) {
         val group = groupRepository.findByIdOrNull(groupId)
-            ?: throw RuntimeException("Группа не найдена")
+            ?: throw BusinessException(
+                code = "GROUP_NOT_FOUND",
+                userMessage = "Группа не найдена",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         // ВАЖНО: Сначала отвязываем студентов, иначе БД не даст удалить (Foreign Key)
         // Либо студенты удалятся вместе с группой (если CascadeType.ALL), что ПЛОХО.

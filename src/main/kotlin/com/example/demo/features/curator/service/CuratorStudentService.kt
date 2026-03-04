@@ -35,12 +35,36 @@ class CuratorStudentService(
         request: CuratorStudentCategoryUpdateRequest
     ): AdminUserDto {
         val curator = requireCurator(curatorLogin)
-        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет идентификатор")
-        val student = userRepository.findById(studentId).orElseThrow { RuntimeException("Студент не найден") }
-        if (!student.roles.contains(Role.STUDENT)) throw RuntimeException("Пользователь не является студентом")
-        val groupId = student.group?.id ?: throw RuntimeException("Студент не привязан к группе")
+        val curatorId = curator.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "Профиль куратора поврежден. Обратитесь к администратору.",
+            status = HttpStatus.CONFLICT,
+        )
+        val student = userRepository.findById(studentId).orElseThrow {
+            BusinessException(
+                code = "STUDENT_NOT_FOUND",
+                userMessage = "Студент не найден.",
+                status = HttpStatus.NOT_FOUND,
+            )
+        }
+        if (!student.roles.contains(Role.STUDENT)) {
+            throw BusinessException(
+                code = "TARGET_NOT_STUDENT",
+                userMessage = "Можно менять категорию только студенту.",
+                status = HttpStatus.BAD_REQUEST,
+            )
+        }
+        val groupId = student.group?.id ?: throw BusinessException(
+            code = "STUDENT_GROUP_REQUIRED",
+            userMessage = "Студент не привязан к группе.",
+            status = HttpStatus.CONFLICT,
+        )
         if (!groupRepository.existsByIdAndCuratorId(groupId, curatorId)) {
-            throw RuntimeException("Можно менять категорию только студентов своих групп")
+            throw BusinessException(
+                code = "GROUP_ACCESS_DENIED",
+                userMessage = "Можно менять категорию только студентов своих групп.",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
 
         student.studentCategory = request.studentCategory
@@ -60,13 +84,21 @@ class CuratorStudentService(
 
     fun listMyStudents(curatorLogin: String, groupId: Int? = null): List<CuratorStudentRow> {
         val curator = requireCurator(curatorLogin)
-        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет идентификатор")
+        val curatorId = curator.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "Профиль куратора поврежден. Обратитесь к администратору.",
+            status = HttpStatus.CONFLICT,
+        )
         val groups = groupRepository.findAllByCuratorId(curatorId)
         val groupsById = groups.associateBy { it.id }
         val allowedGroupIds = groupsById.keys.filterNotNull().toSet()
         if (allowedGroupIds.isEmpty()) return emptyList()
         if (groupId != null && groupId !in allowedGroupIds) {
-            throw RuntimeException("Группа недоступна куратору")
+            throw BusinessException(
+                code = "GROUP_ACCESS_DENIED",
+                userMessage = "Группа недоступна куратору.",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
         val targetGroupIds = if (groupId == null) allowedGroupIds else setOf(groupId)
 
@@ -94,12 +126,36 @@ class CuratorStudentService(
         request: CuratorStudentAbsenceRequest
     ) {
         val curator = requireCurator(curatorLogin)
-        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет идентификатор")
-        val student = userRepository.findById(studentId).orElseThrow { RuntimeException("Студент не найден") }
-        if (!student.roles.contains(Role.STUDENT)) throw RuntimeException("Пользователь не является студентом")
-        val groupId = student.group?.id ?: throw RuntimeException("Студент не привязан к группе")
+        val curatorId = curator.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "Профиль куратора поврежден. Обратитесь к администратору.",
+            status = HttpStatus.CONFLICT,
+        )
+        val student = userRepository.findById(studentId).orElseThrow {
+            BusinessException(
+                code = "STUDENT_NOT_FOUND",
+                userMessage = "Студент не найден.",
+                status = HttpStatus.NOT_FOUND,
+            )
+        }
+        if (!student.roles.contains(Role.STUDENT)) {
+            throw BusinessException(
+                code = "TARGET_NOT_STUDENT",
+                userMessage = "Можно менять питание только студенту.",
+                status = HttpStatus.BAD_REQUEST,
+            )
+        }
+        val groupId = student.group?.id ?: throw BusinessException(
+            code = "STUDENT_GROUP_REQUIRED",
+            userMessage = "Студент не привязан к группе.",
+            status = HttpStatus.CONFLICT,
+        )
         if (!groupRepository.existsByIdAndCuratorId(groupId, curatorId)) {
-            throw RuntimeException("Можно менять питание только студентов своих групп")
+            throw BusinessException(
+                code = "GROUP_ACCESS_DENIED",
+                userMessage = "Можно менять питание только студентов своих групп.",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
         if (student.accountStatus == AccountStatus.FROZEN_EXPELLED) {
             throw BusinessException(
@@ -113,7 +169,7 @@ class CuratorStudentService(
         if (reasonType == NoMealReasonType.MISSING_ROSTER) {
             throw BusinessException(
                 code = "NO_MEAL_REASON_INVALID",
-                userMessage = "Причина MISSING_ROSTER устанавливается только системой.",
+                userMessage = "Причина «Куратор не заполнил табель» выставляется только системой после дедлайна.",
             )
         }
 
@@ -168,7 +224,7 @@ class CuratorStudentService(
             permission.reason = listOf(
                 permission.comment,
                 permission.noMealReasonText,
-                reasonType.name
+                noMealReasonTitleRu(reasonType)
             ).firstOrNull { !it.isNullOrBlank() } ?: "Общее основание"
             mealPermissionRepository.save(permission)
         }
@@ -183,9 +239,17 @@ class CuratorStudentService(
     }
 
     private fun requireCurator(curatorLogin: String): UserEntity {
-        val curator = userRepository.findByLogin(curatorLogin) ?: throw RuntimeException("Куратор не найден")
+        val curator = userRepository.findByLogin(curatorLogin) ?: throw BusinessException(
+            code = "CURATOR_NOT_FOUND",
+            userMessage = "Куратор не найден.",
+            status = HttpStatus.NOT_FOUND,
+        )
         if (!curator.roles.contains(Role.CURATOR)) {
-            throw RuntimeException("Действие доступно только куратору")
+            throw BusinessException(
+                code = "ROLE_FORBIDDEN",
+                userMessage = "Действие доступно только куратору.",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
         return curator
     }
@@ -198,5 +262,12 @@ class CuratorStudentService(
             cursor = cursor.plusDays(1)
         }
         return result
+    }
+
+    private fun noMealReasonTitleRu(reasonType: NoMealReasonType): String = when (reasonType) {
+        NoMealReasonType.EXPELLED -> "Отчислен"
+        NoMealReasonType.SICK_LEAVE -> "Больничный"
+        NoMealReasonType.OTHER -> "Иное"
+        NoMealReasonType.MISSING_ROSTER -> "Куратор не заполнил табель"
     }
 }

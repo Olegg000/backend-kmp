@@ -92,7 +92,7 @@ class ReportsController(
 
     @GetMapping("/consumption/summary")
     @PreAuthorize("hasAnyRole('ADMIN', 'CURATOR')")
-    @Operation(summary = "Сводный отчет по 3 единицам (завтрак, обед, завтрак+обед)")
+    @Operation(summary = "Сводка")
     fun getConsumptionSummary(
         principal: Principal,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,

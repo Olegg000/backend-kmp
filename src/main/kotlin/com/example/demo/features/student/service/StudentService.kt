@@ -5,9 +5,11 @@ import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.roster.dto.DayPermissionDto
 import com.example.demo.features.student.dto.StudentSelfRosterDto
 import com.example.demo.features.student.dto.StudentTodayMealsDto
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.DayOfWeek
@@ -77,5 +79,9 @@ class StudentService(
 
     private fun findStudentByLogin(login: String): UserEntity =
         userRepository.findByLogin(login)
-            ?: throw RuntimeException("Пользователь не найден: $login")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 }

@@ -9,6 +9,7 @@ import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.statistics.service.StatisticsService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -197,9 +199,10 @@ class StatisticsServiceTest(
             )
         )
 
-        val ex = assertThrows(RuntimeException::class.java) {
+        val ex = assertThrows(BusinessException::class.java) {
             statisticsService.getGroupMealStatus(curatorNoGroup.login, LocalDate.now())
         }
-        assertTrue(ex.message!!.contains("не привязан"))
+        assertEquals("CURATOR_GROUP_ACCESS_DENIED", ex.code)
+        assertEquals(HttpStatus.FORBIDDEN, ex.status)
     }
 }

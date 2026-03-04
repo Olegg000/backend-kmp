@@ -40,18 +40,34 @@ class RosterService(
         val weekStart = rosterWeekPolicy.weekStart(startDate)
         ensureWeekReadable(weekStart)
 
-        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет id")
+        val curatorId = curator.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "У куратора отсутствует идентификатор",
+            status = HttpStatus.CONFLICT,
+        )
         val curatorGroups = groupRepository.findAllByCuratorId(curatorId)
         if (curatorGroups.isEmpty()) {
-            throw RuntimeException("Куратор не привязан к группам")
+            throw BusinessException(
+                code = "CURATOR_GROUP_ACCESS_DENIED",
+                userMessage = "Куратор не привязан к группам",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
 
         val targetGroup = if (groupId != null) {
             curatorGroups.firstOrNull { it.id == groupId }
-                ?: throw RuntimeException("Группа недоступна куратору")
+                ?: throw BusinessException(
+                    code = "CURATOR_GROUP_ACCESS_DENIED",
+                    userMessage = "Группа недоступна куратору",
+                    status = HttpStatus.FORBIDDEN,
+                )
         } else {
             curatorGroups.minByOrNull { it.id ?: Int.MAX_VALUE }
-                ?: throw RuntimeException("Группа не найдена")
+                ?: throw BusinessException(
+                    code = "GROUP_NOT_FOUND",
+                    userMessage = "Группа не найдена",
+                    status = HttpStatus.NOT_FOUND,
+                )
         }
 
         val students = userRepository.findAllByGroup(targetGroup)
@@ -90,13 +106,31 @@ class RosterService(
     @Transactional
     fun updateRoster(req: UpdateRosterRequest, assignerLogin: String) {
         val student = userRepository.findById(req.studentId)
-            .orElseThrow { RuntimeException("Студент не найден") }
+            .orElseThrow {
+                BusinessException(
+                    code = "STUDENT_NOT_FOUND",
+                    userMessage = "Студент не найден",
+                    status = HttpStatus.NOT_FOUND,
+                )
+            }
 
         val assigner = requireCurator(assignerLogin)
-        val assignerId = assigner.id ?: throw RuntimeException("Куратор не имеет идентификатор")
-        val studentGroupId = student.group?.id ?: throw RuntimeException("Студент не привязан к группе")
+        val assignerId = assigner.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "У куратора отсутствует идентификатор",
+            status = HttpStatus.CONFLICT,
+        )
+        val studentGroupId = student.group?.id ?: throw BusinessException(
+            code = "STUDENT_GROUP_NOT_SET",
+            userMessage = "Студент не привязан к группе",
+            status = HttpStatus.CONFLICT,
+        )
         if (!groupRepository.existsByIdAndCuratorId(studentGroupId, assignerId)) {
-            throw RuntimeException("Можно обновлять табель только студентов своих групп")
+            throw BusinessException(
+                code = "CURATOR_GROUP_ACCESS_DENIED",
+                userMessage = "Можно обновлять табель только студентов своих групп",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
 
         if (student.studentCategory == null) {
@@ -121,7 +155,11 @@ class RosterService(
             touchedWeeks += rosterWeekPolicy.weekStart(dto.date)
 
             if (student.studentCategory == StudentCategory.MANY_CHILDREN && dto.isBreakfast && dto.isLunch) {
-                throw RuntimeException("Категории 'Многодетные' можно назначить только один прием пищи в день")
+                throw BusinessException(
+                    code = "MANY_CHILDREN_LIMIT",
+                    userMessage = "Категории 'Многодетные' можно назначить только один прием пищи в день",
+                    status = HttpStatus.BAD_REQUEST,
+                )
             }
 
             val validatedNoMeal = validateNoMealPayload(dto)
@@ -170,7 +208,7 @@ class RosterService(
         if (reasonType == NoMealReasonType.MISSING_ROSTER) {
             throw BusinessException(
                 code = "NO_MEAL_REASON_INVALID",
-                userMessage = "Причина MISSING_ROSTER устанавливается только системой.",
+                userMessage = "Причина «Куратор не заполнил табель» выставляется только системой после дедлайна.",
             )
         }
 
@@ -218,7 +256,7 @@ class RosterService(
         val noMealReason = dto.noMealReasonText?.trim()?.ifBlank { null }
         if (!noMealReason.isNullOrBlank()) return noMealReason
 
-        return reasonType?.name ?: "Общее основание"
+        return reasonType?.let(::noMealReasonTitleRu) ?: "Общее основание"
     }
 
     private fun validateDateCanBeEdited(date: LocalDate) {
@@ -254,6 +292,13 @@ class RosterService(
                 userMessage = "Табель доступен только для следующей недели и далее.",
             )
         }
+    }
+
+    private fun noMealReasonTitleRu(reasonType: NoMealReasonType): String = when (reasonType) {
+        NoMealReasonType.EXPELLED -> "Отчислен"
+        NoMealReasonType.SICK_LEAVE -> "Больничный"
+        NoMealReasonType.OTHER -> "Иное"
+        NoMealReasonType.MISSING_ROSTER -> "Куратор не заполнил табель"
     }
 
     private fun updateWeekSubmissionState(curator: UserEntity, weekStart: LocalDate) {
@@ -329,9 +374,17 @@ class RosterService(
 
     private fun requireCurator(curatorLogin: String): UserEntity {
         val curator = userRepository.findByLogin(curatorLogin)
-            ?: throw RuntimeException("Куратор не найден")
+            ?: throw BusinessException(
+                code = "CURATOR_NOT_FOUND",
+                userMessage = "Куратор не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
         if (!curator.roles.contains(Role.CURATOR)) {
-            throw RuntimeException("Действие доступно только куратору")
+            throw BusinessException(
+                code = "ROSTER_ACCESS_DENIED",
+                userMessage = "Действие доступно только куратору",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
         return curator
     }

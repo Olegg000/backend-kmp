@@ -17,30 +17,40 @@ class NotificationWorker(
 ) {
     private val log = LoggerFactory.getLogger(NotificationWorker::class.java)
 
-    // Базовое напоминание для Пн-Чт.
-    @Scheduled(cron = "0 0 10 * * ?", zone = "\${app.business-zone:Europe/Samara}")
-    fun sendDailyCuratorReminders() {
+    // Утренние напоминания в 07:00 по Самаре.
+    @Scheduled(cron = "0 0 7 * * ?", zone = "\${app.business-zone:Europe/Samara}")
+    fun sendMorningReminders() {
         val now = rosterWeekPolicy.now()
-        if (now.dayOfWeek == java.time.DayOfWeek.FRIDAY || now.dayOfWeek == java.time.DayOfWeek.SATURDAY || now.dayOfWeek == java.time.DayOfWeek.SUNDAY) {
+        if (now.dayOfWeek == java.time.DayOfWeek.SATURDAY || now.dayOfWeek == java.time.DayOfWeek.SUNDAY) {
             return
         }
 
-        log.info("Running daily curator reminder worker at {}", now)
+        try {
+            notificationService.notifyStudentsMorningKeyReminder(now.toLocalDate())
+            notificationService.notifyChefsMorningKeyReminder(now.toLocalDate())
+        } catch (e: Exception) {
+            log.error("Failed morning key reminders at {}", now, e)
+        }
+
+        log.info("Running curator morning reminder worker at {}", now)
         val curators = userRepository.findAllByRoleAndAccountStatus(Role.CURATOR, AccountStatus.ACTIVE)
         curators.forEach { curator ->
-            try {
-                notificationService.sendCuratorDailyReminderIfNeeded(curator)
-            } catch (e: Exception) {
-                log.error("Failed daily reminder for {}", curator.login, e)
+            runCatching {
+                if (now.dayOfWeek != java.time.DayOfWeek.FRIDAY) {
+                    notificationService.sendCuratorDailyReminderIfNeeded(curator)
+                }
+                notificationService.sendCuratorPostSubmitCheckInIfNeeded(curator)
+            }.onFailure { e ->
+                log.error("Failed curator morning reminder for {}", curator.login, e)
             }
         }
     }
 
-    // Пятничная эскалация: каждый час до 12:00, только если нулевое заполнение.
+    // Пятничная эскалация: каждый час с 07:00 до 11:59, только если нулевое заполнение.
     @Scheduled(cron = "0 0 * * * ?", zone = "\${app.business-zone:Europe/Samara}")
     fun sendFridayHourlyEscalation() {
         val now = rosterWeekPolicy.now()
-        if (now.dayOfWeek != java.time.DayOfWeek.FRIDAY || now.hour >= 12) {
+        if (now.dayOfWeek != java.time.DayOfWeek.FRIDAY || now.hour !in 7..11) {
             return
         }
 
@@ -55,17 +65,22 @@ class NotificationWorker(
         }
     }
 
-    // После дедлайна напоминаем поварам о доступном недельном отчете.
-    @Scheduled(cron = "0 5 12 * * ?", zone = "\${app.business-zone:Europe/Samara}")
-    fun sendChefReportAvailabilityAfterDeadline() {
+    // Напоминания поварам в окно подтверждения отчета:
+    // пятница 12:05, суббота 07:05, воскресенье 07:05 (Samara).
+    @Scheduled(cron = "0 5 * * * ?", zone = "\${app.business-zone:Europe/Samara}")
+    fun sendChefReportConfirmationReminders() {
         val now = rosterWeekPolicy.now()
-        if (now.dayOfWeek != java.time.DayOfWeek.FRIDAY) {
+        val isFridayNoon = now.dayOfWeek == java.time.DayOfWeek.FRIDAY && now.hour == 12
+        val isWeekendMorning =
+            (now.dayOfWeek == java.time.DayOfWeek.SATURDAY || now.dayOfWeek == java.time.DayOfWeek.SUNDAY) &&
+                now.hour == 7
+        if (!isFridayNoon && !isWeekendMorning) {
             return
         }
 
-        val weekStart = rosterWeekPolicy.nextWeekStart(now.toLocalDate()).toString()
+        val weekStart = rosterWeekPolicy.nextWeekStart(now.toLocalDate())
         try {
-            val sent = notificationService.notifyChefsWeeklyReportAvailable(weekStart)
+            val sent = notificationService.notifyChefsWeeklyReportConfirmWindow(weekStart, now)
             if (sent > 0) {
                 log.info("Chef weekly report notifications sent: weekStart={}, count={}", weekStart, sent)
             } else {

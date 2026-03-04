@@ -8,6 +8,7 @@ import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.curator.dto.CuratorStudentCategoryUpdateRequest
 import com.example.demo.features.curator.service.CuratorStudentService
 import com.example.demo.features.roster.service.RosterWeekPolicy
@@ -124,6 +125,8 @@ class CuratorStudentServiceTest(
         }
 
         assertTrue(ex.message!!.contains("только студентов своих групп"))
+        assertTrue(ex is BusinessException)
+        assertEquals("GROUP_ACCESS_DENIED", (ex as BusinessException).code)
     }
 
     @Test

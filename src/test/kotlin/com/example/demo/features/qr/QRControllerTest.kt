@@ -3,10 +3,13 @@ package com.example.demo.features.qr
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.MealType
 import com.example.demo.core.database.Role
+import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.UserEntity
+import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
 import com.example.demo.core.util.CryptoUtils
+import com.example.demo.features.qr.dto.OfflineTransactionDto
 import com.example.demo.features.qr.dto.ValidateQRRequest
 import com.example.demo.features.qr.service.QRCodeService
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,6 +26,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 
 @SpringBootTest
@@ -40,6 +45,9 @@ class QRControllerTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var permissionRepository: MealPermissionRepository
 
     @Autowired
     private lateinit var jwtUtils: JwtUtils
@@ -229,5 +237,85 @@ class QRControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.isValid").value(false))
             .andExpect(jsonPath("$.errorCode").value("QR_EXPIRED"))
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/qr/sync отклоняет поддельную подпись")
+    fun `sync endpoint rejects forged signature`() {
+        val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
+        val transaction = OfflineTransactionDto(
+            userId = student.id.toString(),
+            timestamp = timestamp,
+            mealType = MealType.LUNCH,
+            nonce = CryptoUtils.generateNonce(),
+            signature = "A".repeat(64),
+        )
+
+        mockMvc.perform(
+            post("/api/v1/qr/sync")
+                .header("Authorization", "Bearer $chefToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(listOf(transaction)))
+                .with(csrf())
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.successCount").value(0))
+            .andExpect(jsonPath("$.failedCount").value(1))
+            .andExpect(jsonPath("$.errors[0].reason").value("Неверная подпись"))
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/qr/sync принимает валидную подписанную транзакцию")
+    fun `sync endpoint accepts valid signed transaction`() {
+        val timestamp = qrCodeService.roundTimestamp(System.currentTimeMillis() / 1000)
+        val nonce = CryptoUtils.generateNonce()
+        val signature = qrCodeService.generateSignature(
+            student.id.toString(),
+            timestamp,
+            MealType.LUNCH,
+            nonce,
+            privateKey
+        )
+
+        val assigner = userRepository.save(
+            UserEntity(
+                login = "curator-sync",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.CURATOR),
+                name = "Мария",
+                surname = "Классова",
+                fatherName = "Руководителевна",
+            )
+        )
+        val mealDate = Instant.ofEpochSecond(timestamp).atZone(ZoneId.of("Europe/Samara")).toLocalDate()
+        permissionRepository.save(
+            MealPermissionEntity(
+                date = mealDate,
+                student = student,
+                assignedBy = assigner,
+                reason = "Тест sync",
+                isBreakfastAllowed = false,
+                isLunchAllowed = true,
+            )
+        )
+
+        val transaction = OfflineTransactionDto(
+            userId = student.id.toString(),
+            timestamp = timestamp,
+            mealType = MealType.LUNCH,
+            nonce = nonce,
+            signature = signature,
+        )
+
+        mockMvc.perform(
+            post("/api/v1/qr/sync")
+                .header("Authorization", "Bearer $chefToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(listOf(transaction)))
+                .with(csrf())
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.successCount").value(1))
+            .andExpect(jsonPath("$.failedCount").value(0))
     }
 }

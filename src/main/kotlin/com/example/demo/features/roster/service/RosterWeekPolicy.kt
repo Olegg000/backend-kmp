@@ -30,6 +30,19 @@ class RosterWeekPolicy(
         return previousFriday.atTime(12, 0)
     }
 
+    fun chefConfirmationWindowStart(weekStart: LocalDate): LocalDateTime = deadlineForWeek(weekStart)
+
+    fun chefConfirmationWindowEnd(weekStart: LocalDate): LocalDateTime = weekStart.atStartOfDay()
+
+    fun isChefConfirmationWindowOpen(
+        weekStart: LocalDate,
+        at: LocalDateTime = now(),
+    ): Boolean {
+        val start = chefConfirmationWindowStart(weekStart)
+        val end = chefConfirmationWindowEnd(weekStart)
+        return !at.isBefore(start) && at.isBefore(end)
+    }
+
     fun isLockedWeek(weekStart: LocalDate, at: LocalDateTime = now()): Boolean {
         val nextWeek = nextWeekStart(at.toLocalDate())
         if (weekStart != nextWeek) return false

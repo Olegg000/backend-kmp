@@ -1,7 +1,6 @@
 package com.example.demo.features.qr
 
 import com.example.demo.config.TestProfileResolver
-import com.example.demo.config.TimeConfig
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
@@ -21,23 +20,42 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
-import java.time.DayOfWeek
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
+import java.time.ZoneId
 
 @DataJpaTest
-@Import(ChefDataService::class, WeeklyRosterFreezeService::class, RosterWeekPolicy::class, TimeConfig::class)
+@Import(
+    ChefDataService::class,
+    WeeklyRosterFreezeService::class,
+    RosterWeekPolicy::class,
+    ChefWeeklyReportServiceTest.FixedFridayClockConfig::class,
+)
 @ActiveProfiles(resolver = TestProfileResolver::class)
 @DisplayName("Chef weekly report - snapshot and confirmation")
 class ChefWeeklyReportServiceTest(
     @Autowired private val chefDataService: ChefDataService,
     @Autowired private val weeklyRosterFreezeService: WeeklyRosterFreezeService,
+    @Autowired private val rosterWeekPolicy: RosterWeekPolicy,
     @Autowired private val groupRepository: GroupRepository,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val mealPermissionRepository: MealPermissionRepository,
 ) {
+    @TestConfiguration
+    class FixedFridayClockConfig {
+        @Bean
+        fun businessZoneId(): ZoneId = ZoneId.of("Europe/Samara")
+
+        @Bean
+        fun businessClock(zoneId: ZoneId): Clock =
+            Clock.fixed(Instant.parse("2026-03-06T09:30:00Z"), zoneId) // 12:30 Самара
+    }
+
 
     private lateinit var group: GroupEntity
     private lateinit var curator: UserEntity
@@ -86,7 +104,7 @@ class ChefWeeklyReportServiceTest(
             )
         )
 
-        weekStart = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+        weekStart = rosterWeekPolicy.nextWeekStart()
         mealPermissionRepository.save(
             MealPermissionEntity(
                 date = weekStart,

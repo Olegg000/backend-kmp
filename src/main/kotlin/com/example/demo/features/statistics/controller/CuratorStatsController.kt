@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.security.Principal
+import java.time.Clock
 import java.time.LocalDate
 
 @RestController
@@ -18,7 +19,8 @@ import java.time.LocalDate
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Statistics", description = "Статистика для кураторов")
 class CuratorStatsController(
-    private val statisticsService: StatisticsService
+    private val statisticsService: StatisticsService,
+    private val businessClock: Clock,
 ) {
 
     @GetMapping("/my-group")
@@ -29,7 +31,7 @@ class CuratorStatsController(
         @RequestParam(required = false) groupId: Int?,
         principal: Principal
     ): List<StudentMealStatus> {
-        val targetDate = date ?: LocalDate.now()
+        val targetDate = date ?: LocalDate.now(businessClock)
         return statisticsService.getGroupMealStatus(principal.name, targetDate, groupId)
     }
 }

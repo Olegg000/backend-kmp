@@ -3,6 +3,7 @@ package com.example.demo.features.menu
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.core.database.entity.MenuEntity
 import com.example.demo.core.database.repository.MenuRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.menu.dto.CreateMenuItemRequest
 import com.example.demo.features.menu.service.MenuService
 import org.junit.jupiter.api.Assertions.*
@@ -32,6 +33,7 @@ class MenuServiceTest(
         val dto = CreateMenuItemRequest(
             date = date,
             name = "Суп",
+            location = "Корпус А",
             description = "Гороховый"
         )
 
@@ -39,10 +41,12 @@ class MenuServiceTest(
 
         assertNotNull(saved.id)
         assertEquals("Суп", saved.name)
+        assertEquals("Корпус А", saved.location)
 
         val list = menuService.getMenuForDate(date)
         assertEquals(1, list.size)
         assertEquals("Суп", list[0].name)
+        assertEquals("Корпус А", list[0].location)
     }
 
     @Test
@@ -50,8 +54,8 @@ class MenuServiceTest(
     fun `addMenuItemsBatch works`() {
         val date = LocalDate.now()
         val items = listOf(
-            CreateMenuItemRequest(date, "Суп", "1"),
-            CreateMenuItemRequest(date, "Каша", "2")
+            CreateMenuItemRequest(date, "Суп", "Корпус А", "1"),
+            CreateMenuItemRequest(date, "Каша", "Корпус Б", "2")
         )
 
         val saved = menuService.addMenuItemsBatch(items)
@@ -62,6 +66,50 @@ class MenuServiceTest(
     }
 
     @Test
+    @DisplayName("addMenuItem отклоняет пустую location")
+    fun `addMenuItem rejects blank location`() {
+        val date = LocalDate.now()
+        val ex = assertThrows(BusinessException::class.java) {
+            menuService.addMenuItem(
+                CreateMenuItemRequest(
+                    date = date,
+                    name = "Суп",
+                    location = " ",
+                    description = "Гороховый"
+                )
+            )
+        }
+
+        assertEquals("MENU_LOCATION_REQUIRED", ex.code)
+    }
+
+    @Test
+    @DisplayName("getMenuForDate фильтрует по location")
+    fun `getMenuForDate filters by location`() {
+        val date = LocalDate.now()
+        menuRepository.save(
+            MenuEntity(
+                date = date,
+                name = "Компот",
+                location = "Корпус А",
+                description = "Яблочный",
+            )
+        )
+        menuRepository.save(
+            MenuEntity(
+                date = date,
+                name = "Каша",
+                location = "Корпус Б",
+                description = "Гречневая",
+            )
+        )
+
+        val filtered = menuService.getMenuForDate(date, "корпус а")
+        assertEquals(1, filtered.size)
+        assertEquals("Корпус А", filtered.first().location)
+    }
+
+    @Test
     @DisplayName("deleteItem удаляет блюдо")
     fun `deleteItem removes menu item`() {
         val date = LocalDate.now()
@@ -69,6 +117,7 @@ class MenuServiceTest(
             MenuEntity(
                 date = date,
                 name = "Компот",
+                location = "Корпус А",
                 description = "Фруктовый"
             )
         )

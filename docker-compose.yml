@@ -50,7 +50,6 @@ services:
       # JWT настройки — мапятся на jwt.secret и jwt.lifetime
       JWT_SECRET: "this_is_a_very_long_jwt_secret_key_32+chars"
       JWT_LIFETIME: 86400000
-      SPRING_AI_OPENAI_API_KEY: "dummy-key-for-docker"
 
       # (опционально) если хочешь явно указать стратегию DDL
       # SPRING_JPA_HIBERNATE_DDL_AUTO: update

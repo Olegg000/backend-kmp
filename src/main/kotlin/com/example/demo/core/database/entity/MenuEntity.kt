@@ -16,6 +16,9 @@ class MenuEntity(
     @Column(nullable = false)
     val name: String, // "Суп гороховый"
 
+    @Column(nullable = false)
+    val location: String,
+
     @Column(columnDefinition = "TEXT")
     val description: String? = null, // "С копченостями, 250гр"
 

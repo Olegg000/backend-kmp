@@ -14,6 +14,7 @@ import com.example.demo.features.qr.dto.SyncResponse
 import com.example.demo.features.qr.dto.SyncError
 import org.springframework.dao.DataIntegrityViolationException
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.transaction.annotation.Transactional
@@ -156,19 +157,46 @@ class QRValidationService(
         
         val chefLogin = SecurityContextHolder.getContext().authentication?.name
         val chef = chefLogin?.let { userRepository.findByLogin(it) }
-            ?: throw IllegalStateException("Повар не найден")
+            ?: throw BusinessException(
+                code = "CHEF_NOT_FOUND",
+                userMessage = "Повар не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         var successCount = 0
         var failedCount = 0
         val errors = mutableListOf<SyncError>()
 
         transactions.forEach { tx ->
+            var txHash: String? = null
             try {
+                val transactionHash = qrCodeService.generateTransactionHash(
+                    tx.userId, tx.timestamp, tx.mealType, tx.nonce
+                )
+                txHash = transactionHash
+                val studentId = runCatching { java.util.UUID.fromString(tx.userId) }.getOrElse {
+                    failedCount++
+                    errors.add(
+                        SyncError(
+                            userId = tx.userId,
+                            reason = "Некорректный формат идентификатора студента",
+                            transactionHash = txHash,
+                        )
+                    )
+                    return@forEach
+                }
+
                 // 1. Поиск студента
-                val student = userRepository.findByIdForUpdate(java.util.UUID.fromString(tx.userId))
+                val student = userRepository.findByIdForUpdate(studentId)
                 if (student == null) {
                     failedCount++
-                    errors.add(SyncError(tx.userId, "Студент не найден"))
+                    errors.add(
+                        SyncError(
+                            userId = tx.userId,
+                            reason = "Студент не найден",
+                            transactionHash = txHash,
+                        )
+                    )
                     return@forEach
                 }
 
@@ -184,21 +212,23 @@ class QRValidationService(
 
                 if (!isSignatureValid) {
                     failedCount++
-                    errors.add(SyncError(tx.userId, "Неверная подпись"))
+                    errors.add(
+                        SyncError(
+                            userId = tx.userId,
+                            reason = "Неверная подпись",
+                            transactionHash = txHash,
+                        )
+                    )
                     return@forEach
                 }
 
                 // 3. Проверка на дубликаты (хэш транзакции)
-                val txHash = qrCodeService.generateTransactionHash(
-                    tx.userId, tx.timestamp, tx.mealType, tx.nonce
-                )
-                
-                if (transactionRepository.existsByTransactionHash(txHash)) {
-                     // Уже синхронизировано - считаем как успех (идемпотентность), но не сохраняем дубль
-                     successCount++
-                     return@forEach
+                if (transactionRepository.existsByTransactionHash(transactionHash)) {
+                    // Уже синхронизировано - считаем как успех (идемпотентность), но не сохраняем дубль
+                    successCount++
+                    return@forEach
                 }
-                
+
                 // 4. Сохранение
                 val timestamp = LocalDateTime.ofInstant(
                     Instant.ofEpochSecond(tx.timestamp),
@@ -216,7 +246,13 @@ class QRValidationService(
                 )
                 if (alreadyAteSameMeal) {
                     failedCount++
-                    errors.add(SyncError(tx.userId, "Студент уже получал ${tx.mealType} за эту дату"))
+                    errors.add(
+                        SyncError(
+                            userId = tx.userId,
+                            reason = "Студент уже получал ${tx.mealType} за эту дату",
+                            transactionHash = txHash,
+                        )
+                    )
                     return@forEach
                 }
 
@@ -228,7 +264,13 @@ class QRValidationService(
                     ).isNotEmpty()
                     if (hasAnyMealToday) {
                         failedCount++
-                        errors.add(SyncError(tx.userId, "Категория 'Многодетные' допускает только один прием пищи в день"))
+                        errors.add(
+                            SyncError(
+                                userId = tx.userId,
+                                reason = "Категория 'Многодетные' допускает только один прием пищи в день",
+                                transactionHash = txHash,
+                            )
+                        )
                         return@forEach
                     }
                 }
@@ -240,14 +282,20 @@ class QRValidationService(
                 }
                 if (!isAllowed) {
                     failedCount++
-                    errors.add(SyncError(tx.userId, "Нет разрешения в табеле на ${tx.mealType}"))
+                    errors.add(
+                        SyncError(
+                            userId = tx.userId,
+                            reason = "Нет разрешения в табеле на ${tx.mealType}",
+                            transactionHash = txHash,
+                        )
+                    )
                     return@forEach
                 }
-                
+
                 try {
                     transactionRepository.save(
                         MealTransactionEntity(
-                            transactionHash = txHash,
+                            transactionHash = transactionHash,
                             timeStamp = timestamp,
                             student = student,
                             chef = chef,
@@ -256,7 +304,7 @@ class QRValidationService(
                         )
                     )
                 } catch (_: DataIntegrityViolationException) {
-                    if (transactionRepository.existsByTransactionHash(txHash)) {
+                    if (transactionRepository.existsByTransactionHash(transactionHash)) {
                         successCount++
                         return@forEach
                     }
@@ -266,7 +314,6 @@ class QRValidationService(
                     )
                 }
                 successCount++
-
             } catch (e: Exception) {
                 logger.error("Error syncing transaction for user ${tx.userId}", e)
                 failedCount++
@@ -274,7 +321,13 @@ class QRValidationService(
                     is BusinessException -> e.userMessage
                     else -> "Не удалось синхронизировать транзакцию"
                 }
-                errors.add(SyncError(tx.userId, safeMessage))
+                errors.add(
+                    SyncError(
+                        userId = tx.userId,
+                        reason = safeMessage,
+                        transactionHash = txHash,
+                    )
+                )
             }
         }
 

@@ -39,6 +39,29 @@ class NotificationControllerTest(
 ) {
 
     @Test
+    @DisplayName("GET roster-deadline для не-куратора -> 403")
+    fun `GET roster-deadline should forbid student role`() {
+        val student = userRepository.save(
+            UserEntity(
+                login = "student-notif-forbidden",
+                passwordHash = "h",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Иван",
+                surname = "Студентов",
+                fatherName = "Учащийся",
+            )
+        )
+        val token = jwtUtils.generateToken(student.login, student.roles)
+
+        mockMvc.perform(
+            get("/api/v1/notifications/roster-deadline")
+                .header("Authorization", "Bearer $token")
+                .accept(MediaType.APPLICATION_JSON)
+        )
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `GET roster-deadline returns JSON for curator`() {
         val group = groupRepository.save(GroupEntity(groupName = "ПИ-21"))
 

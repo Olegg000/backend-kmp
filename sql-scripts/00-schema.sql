@@ -37,6 +37,7 @@ CREATE TABLE public.group_curators (
 CREATE TABLE public.menu_items (
     id uuid PRIMARY KEY,
     date date NOT NULL,
+    location character varying(255) NOT NULL,
     description text,
     name character varying(255) NOT NULL,
     photo_url character varying(255)

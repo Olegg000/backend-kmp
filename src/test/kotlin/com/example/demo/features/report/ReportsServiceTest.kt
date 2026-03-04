@@ -16,6 +16,7 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.reports.dto.AssignedByRole
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.service.ReportsService
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -220,7 +222,7 @@ class ReportsServiceTest(
     @DisplayName("CURATOR не может запросить чужую группу по groupId")
     fun `curator cannot request foreign group`() {
         val today = LocalDate.now()
-        val ex = assertThrows(RuntimeException::class.java) {
+        val ex = assertThrows(BusinessException::class.java) {
             reportsService.generateConsumptionReport(
                 currentLogin = curator.login,
                 startDate = today,
@@ -230,7 +232,8 @@ class ReportsServiceTest(
             )
         }
 
-        assertTrue(ex.message!!.contains("Группа недоступна куратору"))
+        assertEquals("CURATOR_GROUP_ACCESS_DENIED", ex.code)
+        assertEquals(HttpStatus.FORBIDDEN, ex.status)
     }
 
     @Test

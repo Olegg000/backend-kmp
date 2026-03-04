@@ -42,4 +42,8 @@ data class ChefWeeklyReportDto(
     val totalBothCount: Int,
     val confirmed: Boolean,
     val confirmedAt: LocalDateTime? = null,
+    val canConfirmNow: Boolean,
+    val confirmWindowStart: LocalDateTime,
+    val confirmWindowEnd: LocalDateTime,
+    val confirmWindowHint: String,
 )

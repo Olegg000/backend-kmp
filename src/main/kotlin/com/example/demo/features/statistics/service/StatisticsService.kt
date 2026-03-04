@@ -5,7 +5,9 @@ import com.example.demo.core.database.Role
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.statistics.dto.StudentMealStatus
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
@@ -19,20 +21,40 @@ class StatisticsService(
 
     fun getGroupMealStatus(curatorLogin: String, date: LocalDate, groupId: Int? = null): List<StudentMealStatus> {
         val curator = userRepository.findByLogin(curatorLogin)
-            ?: throw RuntimeException("Куратор не найден")
+            ?: throw BusinessException(
+                code = "CURATOR_NOT_FOUND",
+                userMessage = "Куратор не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
-        val curatorId = curator.id ?: throw RuntimeException("Куратор не имеет id")
+        val curatorId = curator.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "У куратора отсутствует идентификатор",
+            status = HttpStatus.CONFLICT,
+        )
         val curatorGroups = groupRepository.findAllByCuratorId(curatorId)
         if (curatorGroups.isEmpty()) {
-            throw RuntimeException("Куратор не привязан к группам")
+            throw BusinessException(
+                code = "CURATOR_GROUP_ACCESS_DENIED",
+                userMessage = "Куратор не привязан к группам",
+                status = HttpStatus.FORBIDDEN,
+            )
         }
 
         val targetGroup = if (groupId != null) {
             curatorGroups.firstOrNull { it.id == groupId }
-                ?: throw RuntimeException("Группа недоступна куратору")
+                ?: throw BusinessException(
+                    code = "CURATOR_GROUP_ACCESS_DENIED",
+                    userMessage = "Группа недоступна куратору",
+                    status = HttpStatus.FORBIDDEN,
+                )
         } else {
             curatorGroups.minByOrNull { it.id ?: Int.MAX_VALUE }
-                ?: throw RuntimeException("Группа не найдена")
+                ?: throw BusinessException(
+                    code = "GROUP_NOT_FOUND",
+                    userMessage = "Группа не найдена",
+                    status = HttpStatus.NOT_FOUND,
+                )
         }
 
         val students = userRepository.findAllByGroup(targetGroup)

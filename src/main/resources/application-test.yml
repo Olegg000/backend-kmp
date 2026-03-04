@@ -43,6 +43,12 @@ logging:
 
 app:
   business-zone: Europe/Samara
+  push:
+    enabled: false
+  bootstrap-admin:
+    enabled: false
+  retention:
+    enabled: false
 
 security:
   qr-offline-public: false

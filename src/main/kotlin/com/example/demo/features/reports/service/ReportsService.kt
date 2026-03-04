@@ -13,6 +13,7 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.core.logging.maskLogin
 import com.example.demo.core.logging.maskUuid
 import com.example.demo.features.reports.dto.AssignedByRole
@@ -23,6 +24,7 @@ import com.example.demo.features.reports.dto.ConsumptionSummaryResponse
 import com.example.demo.features.reports.dto.ZeroFillCuratorSummary
 import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
@@ -50,11 +52,19 @@ class ReportsService(
         var currentUserId: UUID? = null
         try {
             if (endDate.isBefore(startDate)) {
-                throw RuntimeException("Дата окончания не может быть раньше даты начала")
+                throw BusinessException(
+                    code = "INVALID_DATE_RANGE",
+                    userMessage = "Дата окончания не может быть раньше даты начала",
+                    status = HttpStatus.BAD_REQUEST,
+                )
             }
 
             val currentUser = userRepository.findByLogin(currentLogin)
-                ?: throw RuntimeException("Пользователь не найден")
+                ?: throw BusinessException(
+                    code = "USER_NOT_FOUND",
+                    userMessage = "Пользователь не найден",
+                    status = HttpStatus.NOT_FOUND,
+                )
             currentUserId = currentUser.id
             logger.info(
                 "Preparing consumption report: loginMasked={}, userIdMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRoleFilter={}",
@@ -125,9 +135,17 @@ class ReportsService(
 
             val rows = mutableListOf<ConsumptionReportRow>()
             groups.forEach { group ->
-                val groupIdValue = group.id ?: throw RuntimeException("У группы отсутствует id")
+                val groupIdValue = group.id ?: throw BusinessException(
+                    code = "GROUP_ID_MISSING",
+                    userMessage = "У группы отсутствует идентификатор",
+                    status = HttpStatus.CONFLICT,
+                )
                 studentsByGroup[group].orEmpty().forEach { student ->
-                    val studentId = student.id ?: throw RuntimeException("У студента отсутствует id")
+                    val studentId = student.id ?: throw BusinessException(
+                        code = "STUDENT_ID_MISSING",
+                        userMessage = "У студента отсутствует идентификатор",
+                        status = HttpStatus.CONFLICT,
+                    )
                     val studentName = fullName(student.surname, student.name, student.fatherName)
                     for (date in dates) {
                         val permission = permissionByStudentDate[StudentDateKey(studentId, date)]
@@ -202,7 +220,11 @@ class ReportsService(
         assignedByRoleFilter: AssignedByRoleFilter,
     ): ConsumptionSummaryResponse {
         if (endDate.isBefore(startDate)) {
-            throw RuntimeException("Дата окончания не может быть раньше даты начала")
+            throw BusinessException(
+                code = "INVALID_DATE_RANGE",
+                userMessage = "Дата окончания не может быть раньше даты начала",
+                status = HttpStatus.BAD_REQUEST,
+            )
         }
 
         val rows = generateConsumptionReport(
@@ -224,7 +246,11 @@ class ReportsService(
         }
 
         val currentUser = userRepository.findByLogin(currentLogin)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         val weekStartFrom = rosterWeekPolicy.weekStart(startDate)
         val weekStartTo = rosterWeekPolicy.weekStart(endDate)
@@ -239,7 +265,11 @@ class ReportsService(
         val zeroFillCurators = filteredAudits
             .filter { it.fillStatus == CuratorWeekFillStatus.ZERO_FILL }
             .map { audit ->
-                val curatorId = audit.curator.id ?: throw RuntimeException("У куратора отсутствует id")
+                val curatorId = audit.curator.id ?: throw BusinessException(
+                    code = "CURATOR_ID_MISSING",
+                    userMessage = "У куратора отсутствует идентификатор",
+                    status = HttpStatus.CONFLICT,
+                )
                 val groupIds = groupRepository.findAllByCuratorId(curatorId)
                     .mapNotNull { it.id }
                     .sorted()
@@ -292,7 +322,7 @@ class ReportsService(
                 it.assignedByName ?: "-",
                 yesNo(it.plannedBreakfast),
                 yesNo(it.plannedLunch),
-                it.noMealReasonType?.name ?: "-",
+                noMealReasonTypeTitleRu(it.noMealReasonType),
                 it.noMealReasonText ?: "-",
                 it.absenceFrom?.toString() ?: "-",
                 it.absenceTo?.toString() ?: "-",
@@ -320,6 +350,14 @@ class ReportsService(
         AssignedByRole.CURATOR -> "Куратор"
     }
 
+    private fun noMealReasonTypeTitleRu(reasonType: NoMealReasonType?): String = when (reasonType) {
+        null -> "-"
+        NoMealReasonType.EXPELLED -> "Отчислен"
+        NoMealReasonType.SICK_LEAVE -> "Больничный"
+        NoMealReasonType.OTHER -> "Иное"
+        NoMealReasonType.MISSING_ROSTER -> "Куратор не заполнил табель"
+    }
+
     private fun resolveAccessibleGroups(
         roles: Set<Role>,
         userId: UUID?,
@@ -327,18 +365,38 @@ class ReportsService(
     ): List<GroupEntity> {
         if (roles.contains(Role.ADMIN)) {
             if (groupId == null) return groupRepository.findAll()
-            return listOf(groupRepository.findById(groupId).orElseThrow { RuntimeException("Группа не найдена") })
+            return listOf(
+                groupRepository.findById(groupId).orElseThrow {
+                    BusinessException(
+                        code = "GROUP_NOT_FOUND",
+                        userMessage = "Группа не найдена",
+                        status = HttpStatus.NOT_FOUND,
+                    )
+                }
+            )
         }
 
         if (roles.contains(Role.CURATOR)) {
-            val curatorId = userId ?: throw RuntimeException("Куратор не имеет идентификатор")
+            val curatorId = userId ?: throw BusinessException(
+                code = "CURATOR_ID_MISSING",
+                userMessage = "У куратора отсутствует идентификатор",
+                status = HttpStatus.CONFLICT,
+            )
             val groups = groupRepository.findAllByCuratorId(curatorId)
             if (groupId == null) return groups
-            val target = groups.firstOrNull { it.id == groupId } ?: throw RuntimeException("Группа недоступна куратору")
+            val target = groups.firstOrNull { it.id == groupId } ?: throw BusinessException(
+                code = "CURATOR_GROUP_ACCESS_DENIED",
+                userMessage = "Группа недоступна куратору",
+                status = HttpStatus.FORBIDDEN,
+            )
             return listOf(target)
         }
 
-        throw RuntimeException("Недостаточно прав для просмотра отчетов")
+        throw BusinessException(
+            code = "REPORT_ACCESS_DENIED",
+            userMessage = "Недостаточно прав для просмотра отчетов",
+            status = HttpStatus.FORBIDDEN,
+        )
     }
 
     private fun resolveAssignedByRole(permission: MealPermissionEntity): AssignedByRole {

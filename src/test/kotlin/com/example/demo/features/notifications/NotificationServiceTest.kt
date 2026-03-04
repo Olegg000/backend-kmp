@@ -9,6 +9,7 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.NotificationRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.notifications.service.NotificationService
 import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.junit.jupiter.api.Assertions.*
@@ -20,6 +21,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.test.context.ActiveProfiles
 import java.time.Clock
 import java.time.DayOfWeek
@@ -89,10 +91,11 @@ class NotificationServiceTest(
     @Test
     @DisplayName("Исключение, если куратор не найден")
     fun `should throw when curator not found`() {
-        val ex = assertThrows(RuntimeException::class.java) {
+        val ex = assertThrows(BusinessException::class.java) {
             notificationService.checkCuratorRosterStatus("no-such-login")
         }
-        assertTrue(ex.message!!.contains("Куратор не найден"))
+        assertEquals("CURATOR_NOT_FOUND", ex.code)
+        assertEquals(HttpStatus.NOT_FOUND, ex.status)
     }
 
     @Test

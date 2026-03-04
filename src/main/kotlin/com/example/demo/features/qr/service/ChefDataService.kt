@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.temporal.TemporalAdjusters
 
 @Service
@@ -106,6 +107,13 @@ class ChefDataService(
             null
         }
 
+        val windowStart = rosterWeekPolicy.chefConfirmationWindowStart(normalizedWeekStart)
+        val windowEnd = rosterWeekPolicy.chefConfirmationWindowEnd(normalizedWeekStart)
+        val canConfirmNow = currentUser.roles.contains(Role.CHEF) &&
+            confirmation == null &&
+            normalizedWeekStart == rosterWeekPolicy.nextWeekStart(rosterWeekPolicy.today()) &&
+            rosterWeekPolicy.isChefConfirmationWindowOpen(normalizedWeekStart)
+
         return ChefWeeklyReportDto(
             weekStart = normalizedWeekStart,
             days = days,
@@ -114,6 +122,10 @@ class ChefDataService(
             totalBothCount = totalBoth,
             confirmed = confirmation != null,
             confirmedAt = confirmation?.confirmedAt,
+            canConfirmNow = canConfirmNow,
+            confirmWindowStart = windowStart,
+            confirmWindowEnd = windowEnd,
+            confirmWindowHint = "Подтверждение доступно с пятницы 12:00 до понедельника 00:00.",
         )
     }
 
@@ -129,6 +141,33 @@ class ChefDataService(
         }
 
         val normalizedWeekStart = weekStart.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val now = rosterWeekPolicy.now()
+        val expectedWeekStart = rosterWeekPolicy.nextWeekStart(now.toLocalDate())
+        if (normalizedWeekStart != expectedWeekStart) {
+            throw BusinessException(
+                code = "CHEF_CONFIRM_INVALID_WEEK",
+                userMessage = "Можно подтверждать только отчет на следующую неделю.",
+                status = HttpStatus.CONFLICT,
+            )
+        }
+
+        val windowStart = rosterWeekPolicy.chefConfirmationWindowStart(normalizedWeekStart)
+        val windowEnd = rosterWeekPolicy.chefConfirmationWindowEnd(normalizedWeekStart)
+        if (now.isBefore(windowStart)) {
+            throw BusinessException(
+                code = "CHEF_CONFIRM_TOO_EARLY",
+                userMessage = "Подтверждение доступно только после пятницы 12:00.",
+                status = HttpStatus.CONFLICT,
+            )
+        }
+        if (!now.isBefore(windowEnd)) {
+            throw BusinessException(
+                code = "CHEF_CONFIRM_WINDOW_CLOSED",
+                userMessage = "Окно подтверждения закрыто. Подтверждение доступно только до понедельника 00:00.",
+                status = HttpStatus.CONFLICT,
+            )
+        }
+
         val existing = chefWeekConfirmationRepository.findByChefAndWeekStart(currentUser, normalizedWeekStart)
         if (existing != null) {
             return

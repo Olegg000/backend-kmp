@@ -7,6 +7,7 @@ data class MenuItemDto(
     val id: UUID,
     val date: LocalDate,
     val name: String,
+    val location: String,
     val description: String?,
     val photoUrl: String?
 )
@@ -14,5 +15,6 @@ data class MenuItemDto(
 data class CreateMenuItemRequest(
     val date: LocalDate,
     val name: String,
+    val location: String?,
     val description: String?
 )

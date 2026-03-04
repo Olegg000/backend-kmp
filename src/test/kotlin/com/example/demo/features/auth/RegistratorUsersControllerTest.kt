@@ -1,6 +1,7 @@
 package com.example.demo.features.auth
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
@@ -9,6 +10,7 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
 import com.example.demo.features.auth.dto.RegistrationDto
+import com.example.demo.features.auth.dto.UpdateLifecycleRequest
 import com.example.demo.features.auth.dto.UpdateUserRolesRequest
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.DisplayName
@@ -50,6 +52,20 @@ class RegistratorUsersControllerTest(
             )
         )
         return jwtUtils.generateToken(admin.login, admin.roles)
+    }
+
+    private fun createRegistratorToken(): String {
+        val registrator = userRepository.save(
+            UserEntity(
+                login = "registrator-reg",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.REGISTRATOR),
+                name = "Рег",
+                surname = "Тестов",
+                fatherName = "Регович"
+            )
+        )
+        return jwtUtils.generateToken(registrator.login, registrator.roles)
     }
 
     @Test
@@ -336,5 +352,65 @@ class RegistratorUsersControllerTest(
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("SELF_DELETE_FORBIDDEN"))
+    }
+
+    @Test
+    @DisplayName("REGISTRATOR не может перевести пользователя в FROZEN_EXPELLED")
+    fun `registrator cannot expel via lifecycle endpoint`() {
+        val token = createRegistratorToken()
+        val student = userRepository.save(
+            UserEntity(
+                login = "student-lifecycle-deny",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Иван",
+                surname = "ЖизненныйЦикл",
+                fatherName = "Тестович",
+                accountStatus = AccountStatus.ACTIVE,
+            )
+        )
+        val request = UpdateLifecycleRequest(
+            status = AccountStatus.FROZEN_EXPELLED,
+            expelNote = "test"
+        )
+
+        mockMvc.perform(
+            patch("/api/v1/registrator/users/${student.id}/lifecycle")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("REGISTRATOR_EXPEL_FORBIDDEN"))
+    }
+
+    @Test
+    @DisplayName("REGISTRATOR может вернуть пользователя в ACTIVE")
+    fun `registrator can unfreeze via lifecycle endpoint`() {
+        val token = createRegistratorToken()
+        val student = userRepository.save(
+            UserEntity(
+                login = "student-lifecycle-allow",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Петр",
+                surname = "Разморозка",
+                fatherName = "Тестович",
+                accountStatus = AccountStatus.FROZEN_EXPELLED,
+            )
+        )
+        val request = UpdateLifecycleRequest(
+            status = AccountStatus.ACTIVE,
+            expelNote = null
+        )
+
+        mockMvc.perform(
+            patch("/api/v1/registrator/users/${student.id}/lifecycle")
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.accountStatus").value("ACTIVE"))
     }
 }

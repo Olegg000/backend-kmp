@@ -74,6 +74,29 @@ management:
 
 app:
   business-zone: ${APP_BUSINESS_ZONE:Europe/Samara}
+  push:
+    enabled: ${APP_PUSH_ENABLED:true}
+    firebase:
+      service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+      service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+  bootstrap-admin:
+    enabled: ${APP_BOOTSTRAP_ADMIN_ENABLED:true}
+    login: ${BOOTSTRAP_ADMIN_LOGIN:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    name: ${BOOTSTRAP_ADMIN_NAME:Системный}
+    surname: ${BOOTSTRAP_ADMIN_SURNAME:Администратор}
+    father-name: ${BOOTSTRAP_ADMIN_FATHER_NAME:Служебный}
+    group-name: ${BOOTSTRAP_ADMIN_GROUP_NAME:101}
+  retention:
+    enabled: ${APP_RETENTION_ENABLED:true}
+    batch-size: ${APP_RETENTION_BATCH_SIZE:1000}
+    meal-days: ${APP_RETENTION_MEAL_DAYS:365}
+    weekly-days: ${APP_RETENTION_WEEKLY_DAYS:365}
+    notifications-days: ${APP_RETENTION_NOTIFICATIONS_DAYS:90}
+    dispatch-log-days: ${APP_RETENTION_DISPATCH_LOG_DAYS:60}
+    password-reset-days: ${APP_RETENTION_PASSWORD_RESET_DAYS:90}
+    suspicious-resolved-days: ${APP_RETENTION_SUSPICIOUS_RESOLVED_DAYS:365}
+    inactive-push-token-days: ${APP_RETENTION_INACTIVE_PUSH_TOKEN_DAYS:120}
 
 security:
   qr-offline-public: ${SECURITY_QR_OFFLINE_PUBLIC:false}

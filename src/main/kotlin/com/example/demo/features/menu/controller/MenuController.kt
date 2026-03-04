@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.Clock
 import java.time.LocalDate
 import java.util.UUID
 
@@ -23,15 +24,26 @@ import java.util.UUID
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "Menu", description = "Управление меню столовой")
 class MenuController(
-    private val menuService: MenuService
+    private val menuService: MenuService,
+    private val businessClock: Clock,
 ) {
 
     @GetMapping
     @Operation(summary = "Получить меню на дату (по дефолту - сегодня)")
-    fun getMenu(@RequestParam(required = false) date: LocalDate?): List<MenuItemDto> {
+    fun getMenu(
+        @RequestParam(required = false) date: LocalDate?,
+        @RequestParam(required = false) location: String?,
+    ): List<MenuItemDto> {
         // Если дата не передана, берем сегодня
-        val targetDate = date ?: LocalDate.now()
-        return menuService.getMenuForDate(targetDate)
+        val targetDate = date ?: LocalDate.now(businessClock)
+        return menuService.getMenuForDate(targetDate, location)
+    }
+
+    @GetMapping("/locations")
+    @Operation(summary = "Получить доступные локации меню на дату (по дефолту - сегодня)")
+    fun getMenuLocations(@RequestParam(required = false) date: LocalDate?): List<String> {
+        val targetDate = date ?: LocalDate.now(businessClock)
+        return menuService.getLocationsForDate(targetDate)
     }
 
     @PostMapping

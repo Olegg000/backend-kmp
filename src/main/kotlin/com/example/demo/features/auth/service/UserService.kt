@@ -286,7 +286,7 @@ class UserServiceQ(
                 status = HttpStatus.NOT_FOUND,
             )
 
-        val now = LocalDateTime.now()
+        val now = LocalDateTime.now(businessClock)
         val start = now.minusDays(1)
 
         val resetCount = passwordResetLogRepository.countByUserAndTimestampBetween(user, start, now)
@@ -533,6 +533,13 @@ class UserServiceQ(
             throw BusinessException(
                 code = "SELF_LIFECYCLE_CHANGE_FORBIDDEN",
                 userMessage = "Нельзя переводить самого себя в отчисленные.",
+                status = HttpStatus.FORBIDDEN,
+            )
+        }
+        if (status == AccountStatus.FROZEN_EXPELLED && actor.roles.contains(Role.REGISTRATOR)) {
+            throw BusinessException(
+                code = "REGISTRATOR_EXPEL_FORBIDDEN",
+                userMessage = "Регистратор не может отчислять. Используйте табель куратора.",
                 status = HttpStatus.FORBIDDEN,
             )
         }

@@ -66,7 +66,7 @@ class ReportsRequestIdControllerTest(
                 .param("endDate", endDate.toString())
                 .param("assignedByRole", "ALL")
         )
-            .andExpect(status().isInternalServerError)
+            .andExpect(status().isBadRequest)
             .andExpect(header().exists(RequestCorrelationFilter.REQUEST_ID_HEADER))
             .andExpect {
                 val headerRequestId = it.response.getHeader(RequestCorrelationFilter.REQUEST_ID_HEADER)

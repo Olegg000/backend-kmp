@@ -1,6 +1,7 @@
 package com.example.demo.features.reports.controller
 
 import com.example.demo.core.database.MealType
+import com.example.demo.core.exception.BusinessException
 import com.example.demo.core.database.repository.SuspiciousTransactionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.reports.dto.SuspiciousTransactionDto
@@ -17,6 +18,8 @@ import java.time.LocalDate
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.http.HttpStatus
+import java.time.Clock
 
 @RestController
 @RequestMapping("/api/v1/reports/fraud")
@@ -26,7 +29,8 @@ class SuspiciousTransactionsController(
     private val service: SuspiciousTransactionsService,
     private val suspiciousRepo: SuspiciousTransactionRepository,
     private val userRepository: UserRepository,
-    private val fraudPdfService: FraudPdfService
+    private val fraudPdfService: FraudPdfService,
+    private val businessClock: Clock,
 ) {
 
     @GetMapping
@@ -46,14 +50,24 @@ class SuspiciousTransactionsController(
     @Operation(summary = "Пометить подозрительную транзакцию как проверенную")
     fun resolve(@PathVariable id: Int, principal: Principal): SuspiciousTransactionDto {
         val entity = suspiciousRepo.findById(id)
-            .orElseThrow { RuntimeException("Запись не найдена") }
+            .orElseThrow {
+                BusinessException(
+                    code = "SUSPICIOUS_TRANSACTION_NOT_FOUND",
+                    userMessage = "Запись не найдена",
+                    status = HttpStatus.NOT_FOUND,
+                )
+            }
 
         val resolver = userRepository.findByLogin(principal.name)
-            ?: throw RuntimeException("Пользователь не найден")
+            ?: throw BusinessException(
+                code = "USER_NOT_FOUND",
+                userMessage = "Пользователь не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
 
         entity.resolved = true
         entity.resolvedBy = resolver
-        entity.resolvedAt = java.time.LocalDateTime.now()
+        entity.resolvedAt = java.time.LocalDateTime.now(businessClock)
         val saved = suspiciousRepo.save(entity)
 
         return service.getSuspicious(saved.date, saved.date)
