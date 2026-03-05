@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
+import java.security.Principal
 import java.util.UUID
 
 @RestController
@@ -22,6 +23,13 @@ class GroupController(
     @Operation(summary = "Получить список всех групп")
     fun getAll(): List<GroupResponse> {
         return groupService.getAllGroups()
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('CURATOR')")
+    @Operation(summary = "Получить список групп текущего куратора")
+    fun getMy(principal: Principal): List<GroupResponse> {
+        return groupService.getMyGroups(principal.name)
     }
 
     @PostMapping

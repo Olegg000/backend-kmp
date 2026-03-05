@@ -198,12 +198,11 @@ class TestModeDemoDataInitializer(
             groupsByName = groupsByName,
         )
 
-        group101.curators.clear()
-        group101.curators.add(curator)
-        groupRepository.save(group101)
-
-        group102.curators.clear()
-        groupRepository.save(group102)
+        val curatorId = curator.id
+        if (curatorId != null && group101.curators.none { it.id == curatorId }) {
+            group101.curators.add(curator)
+            groupRepository.save(group101)
+        }
 
         ensureAdminTodayPermission(admin)
 

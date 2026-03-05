@@ -29,6 +29,34 @@ class GroupService(
         }
     }
 
+    @Transactional(readOnly = true)
+    fun getMyGroups(curatorLogin: String): List<GroupResponse> {
+        val curator = userRepository.findByLogin(curatorLogin)
+            ?: throw BusinessException(
+                code = "CURATOR_NOT_FOUND",
+                userMessage = "Куратор не найден",
+                status = HttpStatus.NOT_FOUND,
+            )
+
+        if (!curator.roles.contains(Role.CURATOR)) {
+            throw BusinessException(
+                code = "CURATOR_ROLE_REQUIRED",
+                userMessage = "Доступно только пользователю с ролью CURATOR",
+                status = HttpStatus.FORBIDDEN,
+            )
+        }
+
+        val curatorId = curator.id ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "У куратора отсутствует идентификатор",
+            status = HttpStatus.CONFLICT,
+        )
+
+        return groupRepository.findAllByCuratorId(curatorId)
+            .sortedBy { it.id ?: Int.MAX_VALUE }
+            .map(::toGroupResponse)
+    }
+
     // 2. Создать группу
     @Transactional
     fun createGroup(req: CreateGroupRequest): GroupResponse {

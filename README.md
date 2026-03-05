@@ -33,7 +33,7 @@ When `APP_TEST_MODE_ENABLED=true`, backend runs deterministic demo seeding on st
 - sets password `password` for all demo logins;
 - seeds current + previous work week for menus/permissions;
 - seeds `demo_` transactions for QR/scanner checks;
-- keeps `Group-102` without curator to surface synthetic `MISSING_ROSTER` in reports.
+- ensures demo curator is linked to `Group-101` (without removing existing curator links in DB).
 
 Demo logins:
 

@@ -1,6 +1,7 @@
 package com.example.demo.core.database
 
 import com.example.demo.config.TestProfileResolver
+import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.MealTransactionRepository
@@ -84,7 +85,6 @@ class TestModeDemoDataInitializerTest {
         assertNotNull(group101)
         assertNotNull(group102)
         assertFalse(group101!!.curators.isEmpty(), "Group-101 должен иметь куратора")
-        assertTrue(group102!!.curators.isEmpty(), "Group-102 должен быть без куратора")
 
         val studentSick = userRepository.findByLogin("stud_Group-101_2")!!
         val studentExpelled = userRepository.findByLogin("stud_Group-101_3")!!
@@ -179,6 +179,50 @@ class TestModeDemoDataInitializerTest {
         val afterAdminTodayPermission = afterAdminTodayPermissions.single()
         assertTrue(afterAdminTodayPermission.isBreakfastAllowed)
         assertTrue(afterAdminTodayPermission.isLunchAllowed)
+    }
+
+    @Test
+    fun `seed preserves existing curator links on rerun`() {
+        val group101 = groupRepository.findByGroupName("Group-101") ?: error("Group-101 must exist")
+        val group102 = groupRepository.findByGroupName("Group-102") ?: error("Group-102 must exist")
+
+        val extraCurator101 = userRepository.save(
+            UserEntity(
+                login = "curator_extra_101",
+                passwordHash = passwordEncoder.encode("password"),
+                roles = mutableSetOf(Role.CURATOR),
+                name = "Ирина",
+                surname = "Тестова",
+                fatherName = "Петровна",
+            )
+        )
+        val extraCurator102 = userRepository.save(
+            UserEntity(
+                login = "curator_extra_102",
+                passwordHash = passwordEncoder.encode("password"),
+                roles = mutableSetOf(Role.CURATOR),
+                name = "Олег",
+                surname = "Проверкин",
+                fatherName = "Иванович",
+            )
+        )
+
+        group101.curators.add(extraCurator101)
+        group102.curators.add(extraCurator102)
+        groupRepository.save(group101)
+        groupRepository.save(group102)
+
+        initializer.run(DefaultApplicationArguments())
+
+        val group101After = groupRepository.findByGroupName("Group-101") ?: error("Group-101 must exist after rerun")
+        val group102After = groupRepository.findByGroupName("Group-102") ?: error("Group-102 must exist after rerun")
+
+        assertTrue(group101After.curators.any { it.id == extraCurator101.id }, "Дополнительный куратор Group-101 не должен удаляться")
+        assertTrue(group102After.curators.any { it.id == extraCurator102.id }, "Дополнительный куратор Group-102 не должен удаляться")
+        assertTrue(
+            group101After.curators.any { it.login == "curator_Group-101" },
+            "Демо-куратор Group-101 должен оставаться привязанным",
+        )
     }
 
     private fun seedRange(): Pair<LocalDate, LocalDate> {
