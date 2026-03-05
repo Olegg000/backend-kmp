@@ -74,6 +74,10 @@ class TestModeDemoDataInitializerTest {
         assertTrue(admin.roles.contains(Role.CHEF))
         assertTrue(admin.roles.contains(Role.CURATOR))
         assertTrue(admin.roles.contains(Role.STUDENT))
+        val adminTodayPermission = mealPermissionRepository.findByStudentAndDate(admin, rosterWeekPolicy.today())
+        assertNotNull(adminTodayPermission, "Админу в test mode должен выдаваться талон на текущую дату")
+        assertTrue(adminTodayPermission!!.isBreakfastAllowed)
+        assertTrue(adminTodayPermission.isLunchAllowed)
 
         val group101 = groupRepository.findByGroupName("Group-101")
         val group102 = groupRepository.findByGroupName("Group-102")
@@ -138,7 +142,20 @@ class TestModeDemoDataInitializerTest {
         val beforeTransactions = mealTransactionRepository.findAllByTransactionHashStartingWith("demo_").size
         val beforeMenu = countSeededMenuRows(seedStart, seedEnd)
 
-        initializer.run(DefaultApplicationArguments(emptyArray()))
+        val admin = userRepository.findByLogin("admin")!!
+        val today = rosterWeekPolicy.today()
+        val beforeAdminTodayPermissions = mealPermissionRepository.findAllByStudentInAndDateBetween(
+            listOf(admin),
+            today,
+            today,
+        )
+        assertEquals(1, beforeAdminTodayPermissions.size)
+        val beforeAdminTodayPermission = beforeAdminTodayPermissions.single()
+        assertNotNull(beforeAdminTodayPermission)
+        assertTrue(beforeAdminTodayPermission.isBreakfastAllowed)
+        assertTrue(beforeAdminTodayPermission.isLunchAllowed)
+
+        initializer.run(DefaultApplicationArguments())
 
         val afterUsers = demoLogins().count { userRepository.findByLogin(it) != null }
         val afterPermissions = mealPermissionRepository.findAllByStudentInAndDateBetween(
@@ -148,11 +165,20 @@ class TestModeDemoDataInitializerTest {
         ).size
         val afterTransactions = mealTransactionRepository.findAllByTransactionHashStartingWith("demo_").size
         val afterMenu = countSeededMenuRows(seedStart, seedEnd)
+        val afterAdminTodayPermissions = mealPermissionRepository.findAllByStudentInAndDateBetween(
+            listOf(admin),
+            today,
+            today,
+        )
 
         assertEquals(beforeUsers, afterUsers)
         assertEquals(beforePermissions, afterPermissions)
         assertEquals(beforeTransactions, afterTransactions)
         assertEquals(beforeMenu, afterMenu)
+        assertEquals(1, afterAdminTodayPermissions.size)
+        val afterAdminTodayPermission = afterAdminTodayPermissions.single()
+        assertTrue(afterAdminTodayPermission.isBreakfastAllowed)
+        assertTrue(afterAdminTodayPermission.isLunchAllowed)
     }
 
     private fun seedRange(): Pair<LocalDate, LocalDate> {

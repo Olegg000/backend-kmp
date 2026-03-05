@@ -26,11 +26,13 @@ import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.LocalTime
 import java.util.UUID
 
 @Service
+@Transactional(readOnly = true)
 class ReportsService(
     private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,

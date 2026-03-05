@@ -205,6 +205,8 @@ class TestModeDemoDataInitializer(
         group102.curators.clear()
         groupRepository.save(group102)
 
+        ensureAdminTodayPermission(admin)
+
         val currentWeekStart = rosterWeekPolicy.weekStart(rosterWeekPolicy.today())
         val previousWeekStart = currentWeekStart.minusWeeks(1)
         val seedDates = (rosterWeekPolicy.weekDates(previousWeekStart) + rosterWeekPolicy.weekDates(currentWeekStart))
@@ -395,6 +397,29 @@ class TestModeDemoDataInitializer(
         }
 
         mealPermissionRepository.saveAll(seededPermissions)
+    }
+
+    private fun ensureAdminTodayPermission(admin: UserEntity) {
+        val today = rosterWeekPolicy.today()
+        val permission = mealPermissionRepository.findByStudentAndDate(admin, today) ?: MealPermissionEntity(
+            date = today,
+            student = admin,
+            assignedBy = admin,
+            reason = "Автовыдача талонов администратору в test-mode",
+            isBreakfastAllowed = true,
+            isLunchAllowed = true,
+        )
+
+        permission.reason = "Автовыдача талонов администратору в test-mode"
+        permission.isBreakfastAllowed = true
+        permission.isLunchAllowed = true
+        permission.noMealReasonType = null
+        permission.noMealReasonText = null
+        permission.absenceFrom = null
+        permission.absenceTo = null
+        permission.comment = null
+
+        mealPermissionRepository.save(permission)
     }
 
     private fun seedTransactions(
