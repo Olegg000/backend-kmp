@@ -30,7 +30,8 @@ data class AuthReturns(
     val surname: String,
     val fatherName: String,
     val groupId: Int?,
-    val studentCategory: StudentCategory?
+    val studentCategory: StudentCategory?,
+    val testMode: Boolean,
 )
 
 data class AuthMeResponse(
@@ -42,7 +43,8 @@ data class AuthMeResponse(
     val groupId: Int?,
     val studentCategory: StudentCategory?,
     val publicKey: String,
-    val privateKey: String
+    val privateKey: String,
+    val testMode: Boolean,
 )
 
 data class RegUser (

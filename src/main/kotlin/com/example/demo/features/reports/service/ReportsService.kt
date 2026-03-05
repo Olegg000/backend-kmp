@@ -149,6 +149,19 @@ class ReportsService(
                     val studentName = fullName(student.surname, student.name, student.fatherName)
                     for (date in dates) {
                         val permission = permissionByStudentDate[StudentDateKey(studentId, date)]
+                        val isSyntheticMissingRoster = permission == null &&
+                            group.curators.isNullOrEmpty() &&
+                            rosterWeekPolicy.isWeekday(date)
+                        val noMealReasonType = permission?.noMealReasonType ?: if (isSyntheticMissingRoster) {
+                            NoMealReasonType.MISSING_ROSTER
+                        } else {
+                            null
+                        }
+                        val noMealReasonText = permission?.noMealReasonText ?: if (isSyntheticMissingRoster) {
+                            "Куратор не назначен, табель не заполнен"
+                        } else {
+                            null
+                        }
                         val assignedByRole = permission?.let(::resolveAssignedByRole)
                         if (assignedByRoleFilter == AssignedByRoleFilter.ADMIN && assignedByRole != AssignedByRole.ADMIN) continue
                         if (assignedByRoleFilter == AssignedByRoleFilter.CURATOR && assignedByRole != AssignedByRole.CURATOR) continue
@@ -177,12 +190,13 @@ class ReportsService(
                             lunchScannedByName = lunchTx?.chef?.let { fullName(it.surname, it.name, it.fatherName) },
                             plannedBreakfast = permission?.isBreakfastAllowed == true,
                             plannedLunch = permission?.isLunchAllowed == true,
-                            noMealReasonType = permission?.noMealReasonType,
-                            noMealReasonText = permission?.noMealReasonText,
+                            noMealReasonType = noMealReasonType,
+                            noMealReasonText = noMealReasonText,
                             absenceFrom = permission?.absenceFrom,
                             absenceTo = permission?.absenceTo,
                             comment = permission?.comment,
-                            isSyntheticMissingRoster = permission?.noMealReasonType == NoMealReasonType.MISSING_ROSTER,
+                            isSyntheticMissingRoster = permission?.noMealReasonType == NoMealReasonType.MISSING_ROSTER ||
+                                isSyntheticMissingRoster,
                         )
                     }
                 }

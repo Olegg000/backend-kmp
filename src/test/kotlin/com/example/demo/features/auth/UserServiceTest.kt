@@ -147,6 +147,7 @@ class UserServiceTest {
         assertEquals("User", response.surname)
         assertEquals("Testovich", response.fatherName)
         assertNull(response.groupId)
+        assertFalse(response.testMode)
     }
 
     @Test
@@ -178,6 +179,28 @@ class UserServiceTest {
 
         assertEquals(updated!!.id, response.userId)
         assertEquals("new-login", response.login)
+    }
+
+    @Test
+    @DisplayName("Профиль /me содержит признак testMode")
+    fun `getMyProfile should include test mode flag`() {
+        val user = userRepository.save(
+            UserEntity(
+                login = "profile-test-mode",
+                passwordHash = passwordEncoder.encode("password"),
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Иван",
+                surname = "Профильный",
+                fatherName = "Тестович",
+                publicKey = "public-key",
+                encryptedPrivateKey = "private-key",
+            )
+        )
+
+        val profile = userService.getMyProfile(user.login)
+
+        assertEquals(user.id, profile.userId)
+        assertFalse(profile.testMode)
     }
 
     @Test

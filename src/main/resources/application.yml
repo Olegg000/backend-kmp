@@ -74,6 +74,8 @@ management:
 
 app:
   business-zone: ${APP_BUSINESS_ZONE:Europe/Samara}
+  test-mode:
+    enabled: ${APP_TEST_MODE_ENABLED:false}
   push:
     enabled: ${APP_PUSH_ENABLED:true}
     firebase:

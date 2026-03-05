@@ -22,6 +22,7 @@ import com.example.demo.features.auth.dto.RegUser
 import com.example.demo.features.auth.dto.RegistrationDto
 import com.example.demo.features.auth.dto.UserCredentialsResponse
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.AuthenticationManager
@@ -42,6 +43,8 @@ class UserServiceQ(
     private val groupRepository: GroupRepository,
     private val passwordResetLogRepository: PasswordResetLogRepository,
     private val businessClock: Clock,
+    @Value("\${app.test-mode.enabled:false}")
+    private val testModeEnabled: Boolean,
 ) {
     @Autowired
     private lateinit var passwordGenerator: PasswordGenerator
@@ -121,7 +124,8 @@ class UserServiceQ(
             surname = user.surname,
             fatherName = user.fatherName,
             groupId = user.group?.id,
-            studentCategory = user.studentCategory
+            studentCategory = user.studentCategory,
+            testMode = testModeEnabled,
         )
     }
 
@@ -177,7 +181,8 @@ class UserServiceQ(
             groupId = user.group?.id,
             studentCategory = user.studentCategory,
             publicKey = publicKey,
-            privateKey = privateKey
+            privateKey = privateKey,
+            testMode = testModeEnabled,
         )
     }
 

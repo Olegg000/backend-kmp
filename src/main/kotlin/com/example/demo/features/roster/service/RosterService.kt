@@ -16,6 +16,7 @@ import com.example.demo.features.notifications.service.NotificationService
 import com.example.demo.features.roster.dto.DayPermissionDto
 import com.example.demo.features.roster.dto.StudentRosterRow
 import com.example.demo.features.roster.dto.UpdateRosterRequest
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -29,6 +30,8 @@ class RosterService(
     private val weekSubmissionRepository: CuratorWeekSubmissionRepository,
     private val notificationService: NotificationService,
     private val rosterWeekPolicy: RosterWeekPolicy,
+    @Value("\${app.test-mode.enabled:false}")
+    private val testModeEnabled: Boolean,
 ) {
 
     fun getRosterForGroup(
@@ -268,15 +271,27 @@ class RosterService(
         }
 
         val targetWeek = rosterWeekPolicy.weekStart(date)
-        val nextWeek = rosterWeekPolicy.nextWeekStart()
-        if (targetWeek.isBefore(nextWeek)) {
+        val minReadableWeek = minimumReadableWeek()
+        if (targetWeek.isBefore(minReadableWeek)) {
             throw BusinessException(
                 code = "ROSTER_ONLY_NEXT_WEEK_OR_LATER",
-                userMessage = "Заполнять можно только следующую неделю и дальше.",
+                userMessage = if (testModeEnabled) {
+                    "Заполнять можно только текущую неделю и дальше."
+                } else {
+                    "Заполнять можно только следующую неделю и дальше."
+                },
             )
         }
 
-        if (!rosterWeekPolicy.isDateEditable(date)) {
+        if (testModeEnabled) {
+            val nextWeek = rosterWeekPolicy.nextWeekStart()
+            if (targetWeek == nextWeek && !rosterWeekPolicy.isDateEditable(date)) {
+                throw BusinessException(
+                    code = "ROSTER_WEEK_LOCKED",
+                    userMessage = "После пятницы 12:00 табель на следующую неделю становится только для чтения.",
+                )
+            }
+        } else if (!rosterWeekPolicy.isDateEditable(date)) {
             throw BusinessException(
                 code = "ROSTER_WEEK_LOCKED",
                 userMessage = "После пятницы 12:00 табель на следующую неделю становится только для чтения.",
@@ -285,12 +300,23 @@ class RosterService(
     }
 
     private fun ensureWeekReadable(weekStart: LocalDate) {
-        val nextWeek = rosterWeekPolicy.nextWeekStart()
-        if (weekStart.isBefore(nextWeek)) {
+        if (weekStart.isBefore(minimumReadableWeek())) {
             throw BusinessException(
                 code = "ROSTER_ONLY_NEXT_WEEK_OR_LATER",
-                userMessage = "Табель доступен только для следующей недели и далее.",
+                userMessage = if (testModeEnabled) {
+                    "Табель доступен только для текущей недели и далее."
+                } else {
+                    "Табель доступен только для следующей недели и далее."
+                },
             )
+        }
+    }
+
+    private fun minimumReadableWeek(): LocalDate {
+        return if (testModeEnabled) {
+            rosterWeekPolicy.weekStart(rosterWeekPolicy.today())
+        } else {
+            rosterWeekPolicy.nextWeekStart()
         }
     }
 

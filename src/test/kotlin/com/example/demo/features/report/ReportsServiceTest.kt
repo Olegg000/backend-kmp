@@ -4,6 +4,7 @@ import com.example.demo.config.TestProfileResolver
 import com.example.demo.config.TimeConfig
 import com.example.demo.core.database.CuratorWeekFillStatus
 import com.example.demo.core.database.MealType
+import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.CuratorWeekAuditEntity
@@ -281,6 +282,46 @@ class ReportsServiceTest(
         assertTrue(g1Row.breakfastUsed)
         assertTrue(g1Row.breakfastTransactionId != null)
         assertEquals("Кухонный Повар В", g1Row.breakfastScannedByName)
+    }
+
+    @Test
+    @DisplayName("Для группы без куратора и без табеля проставляется synthetic MISSING_ROSTER")
+    fun `report should add synthetic missing roster for groups without curator`() {
+        val today = LocalDate.now()
+        val studentWithoutPermission = userRepository.save(
+            UserEntity(
+                login = "student-no-curator-no-roster",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Сергей",
+                surname = "БезКуратора",
+                fatherName = "Тестович",
+                group = group2,
+                studentCategory = StudentCategory.SVO,
+            )
+        )
+
+        val rows = reportsService.generateConsumptionReport(
+            currentLogin = admin.login,
+            startDate = today,
+            endDate = today,
+            groupId = group2.id,
+            assignedByRoleFilter = AssignedByRoleFilter.ALL,
+        )
+        val targetRow = rows.first { it.studentId == studentWithoutPermission.id }
+
+        assertEquals(NoMealReasonType.MISSING_ROSTER, targetRow.noMealReasonType)
+        assertEquals("Куратор не назначен, табель не заполнен", targetRow.noMealReasonText)
+        assertTrue(targetRow.isSyntheticMissingRoster)
+
+        val summary = reportsService.generateConsumptionSummary(
+            currentLogin = admin.login,
+            startDate = today,
+            endDate = today,
+            groupId = group2.id,
+            assignedByRoleFilter = AssignedByRoleFilter.ALL,
+        )
+        assertTrue(summary.missingRosterRowsCount >= 1)
     }
 
     @Test

@@ -237,4 +237,16 @@ class RosterServiceTest {
 
         assertEquals("ROSTER_ONLY_NEXT_WEEK_OR_LATER", ex.code)
     }
+
+    @Test
+    @DisplayName("Текущая неделя недоступна для чтения при выключенном test-mode")
+    fun `current week roster read should be forbidden when test mode disabled`() {
+        val thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+
+        val ex = assertThrows(BusinessException::class.java) {
+            rosterService.getRosterForGroup(curator.login, thisMonday)
+        }
+
+        assertEquals("ROSTER_ONLY_NEXT_WEEK_OR_LATER", ex.code)
+    }
 }
