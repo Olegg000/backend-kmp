@@ -20,6 +20,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.temporal.TemporalAdjusters
+import java.util.UUID
 
 @Service
 class ChefDataService(
@@ -83,19 +84,26 @@ class ChefDataService(
             )
         }
 
+        val today = rosterWeekPolicy.today()
+        val nextWeekStart = rosterWeekPolicy.nextWeekStart(today)
         var snapshotRows = weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(normalizedWeekStart)
-        if (snapshotRows.isEmpty() && rosterWeekPolicy.isLockedWeek(normalizedWeekStart)) {
-            weeklyRosterFreezeService.freezeWeek(normalizedWeekStart)
-            snapshotRows = weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(normalizedWeekStart)
+
+        val useSnapshot = when {
+            normalizedWeekStart == nextWeekStart && rosterWeekPolicy.isLockedWeek(normalizedWeekStart) -> {
+                if (snapshotRows.isEmpty()) {
+                    weeklyRosterFreezeService.freezeWeek(normalizedWeekStart)
+                    snapshotRows = weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(normalizedWeekStart)
+                }
+                true
+            }
+            normalizedWeekStart.isBefore(nextWeekStart) -> snapshotRows.isNotEmpty()
+            else -> false
         }
 
-        val days = snapshotRows.map { row ->
-            ChefWeeklyReportDayDto(
-                date = row.date,
-                breakfastCount = row.breakfastCount,
-                lunchCount = row.lunchCount,
-                bothCount = row.bothCount,
-            )
+        val days = if (useSnapshot) {
+            buildDaysFromSnapshot(normalizedWeekStart, snapshotRows)
+        } else {
+            buildDaysFromLivePermissions(normalizedWeekStart)
         }
         val totalBreakfast = days.sumOf { it.breakfastCount }
         val totalLunch = days.sumOf { it.lunchCount }
@@ -127,6 +135,48 @@ class ChefDataService(
             confirmWindowEnd = windowEnd,
             confirmWindowHint = "Подтверждение доступно с пятницы 12:00 до понедельника 00:00.",
         )
+    }
+
+    private fun buildDaysFromSnapshot(
+        weekStart: LocalDate,
+        snapshotRows: List<com.example.demo.core.database.entity.WeeklyReportSnapshotEntity>
+    ): List<ChefWeeklyReportDayDto> {
+        val snapshotByDate = snapshotRows.associateBy { it.date }
+        return rosterWeekPolicy.weekDates(weekStart).map { date ->
+            val row = snapshotByDate[date]
+            ChefWeeklyReportDayDto(
+                date = date,
+                breakfastCount = row?.breakfastCount ?: 0,
+                lunchCount = row?.lunchCount ?: 0,
+                bothCount = row?.bothCount ?: 0,
+            )
+        }
+    }
+
+    private fun buildDaysFromLivePermissions(weekStart: LocalDate): List<ChefWeeklyReportDayDto> {
+        val weekDates = rosterWeekPolicy.weekDates(weekStart)
+        val permissions = permissionRepository.findAllByDateBetween(weekDates.first(), weekDates.last())
+
+        val latestByStudentDate = mutableMapOf<Pair<UUID, LocalDate>, com.example.demo.core.database.entity.MealPermissionEntity>()
+        permissions.forEach { permission ->
+            val studentId = permission.student.id ?: return@forEach
+            val key = studentId to permission.date
+            val previous = latestByStudentDate[key]
+            if (previous == null || (permission.id ?: Int.MIN_VALUE) > (previous.id ?: Int.MIN_VALUE)) {
+                latestByStudentDate[key] = permission
+            }
+        }
+
+        val dayPermissions = latestByStudentDate.values.groupBy { it.date }
+        return weekDates.map { date ->
+            val rows = dayPermissions[date].orEmpty()
+            ChefWeeklyReportDayDto(
+                date = date,
+                breakfastCount = rows.count { it.isBreakfastAllowed },
+                lunchCount = rows.count { it.isLunchAllowed },
+                bothCount = rows.count { it.isBreakfastAllowed && it.isLunchAllowed },
+            )
+        }
     }
 
     fun confirmWeeklyReport(currentLogin: String, weekStart: LocalDate) {

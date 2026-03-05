@@ -7,7 +7,6 @@ import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
-import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.features.notifications.service.NotificationService
 import com.example.demo.features.roster.dto.DayPermissionDto
@@ -15,10 +14,11 @@ import com.example.demo.features.roster.dto.UpdateRosterRequest
 import com.example.demo.features.roster.service.RosterService
 import com.example.demo.features.roster.service.RosterWeekPolicy
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpStatus
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
@@ -43,9 +43,6 @@ class RosterServiceTestModeEnabledTest {
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
-
-    @Autowired
-    private lateinit var permissionRepository: MealPermissionRepository
 
     private lateinit var curator: UserEntity
     private lateinit var student: UserEntity
@@ -95,8 +92,8 @@ class RosterServiceTestModeEnabledTest {
     }
 
     @Test
-    @DisplayName("Текущая неделя доступна для редактирования")
-    fun `current week should be editable`() {
+    @DisplayName("Текущая неделя в test-mode доступна только для просмотра")
+    fun `current week should be read-only in test mode`() {
         val thisMonday = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val request = UpdateRosterRequest(
             studentId = student.id!!,
@@ -110,9 +107,10 @@ class RosterServiceTestModeEnabledTest {
             )
         )
 
-        rosterService.updateRoster(request, curator.login)
-
-        val permission = permissionRepository.findByStudentAndDate(student, thisMonday)
-        assertTrue(permission != null && permission.isBreakfastAllowed)
+        val ex = assertThrows(com.example.demo.core.exception.BusinessException::class.java) {
+            rosterService.updateRoster(request, curator.login)
+        }
+        assertEquals("ROSTER_ONLY_NEXT_WEEK_OR_LATER", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
     }
 }

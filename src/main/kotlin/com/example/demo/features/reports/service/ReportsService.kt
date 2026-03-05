@@ -260,6 +260,9 @@ class ReportsService(
                 bothCount = dateRows.count { it.plannedBreakfast && it.plannedLunch },
             )
         }
+        val usedBreakfastCount = rows.count { it.breakfastUsed }
+        val usedLunchCount = rows.count { it.lunchUsed }
+        val usedBothCount = rows.count { it.breakfastUsed && it.lunchUsed }
 
         val currentUser = userRepository.findByLogin(currentLogin)
             ?: throw BusinessException(
@@ -308,6 +311,9 @@ class ReportsService(
             totalBreakfastCount = days.sumOf { it.breakfastCount },
             totalLunchCount = days.sumOf { it.lunchCount },
             totalBothCount = days.sumOf { it.bothCount },
+            usedBreakfastCount = usedBreakfastCount,
+            usedLunchCount = usedLunchCount,
+            usedBothCount = usedBothCount,
             missingRosterRowsCount = rows.count { it.noMealReasonType == NoMealReasonType.MISSING_ROSTER },
             zeroFillCurators = zeroFillCurators,
         )
@@ -325,7 +331,8 @@ class ReportsService(
             "Дата,ID группы,Группа,ID студента,Студент,Категория,Роль назначившего,ФИО назначившего," +
                 "План завтрак,План обед,Причина непитания,Текст причины,Период с,Период по,Комментарий," +
                 "Завтрак использован,ID транзакции завтрака,ФИО сканировавшего завтрак," +
-                "Обед использован,ID транзакции обеда,ФИО сканировавшего обед\n"
+                "Обед использован,ID транзакции обеда,ФИО сканировавшего обед," +
+                "Статус/Причина (сводно),Период отсутствия (сводно),Комментарий (сводно),Категория (RU)\n"
         val body = rows.joinToString("\n") {
             listOf(
                 it.date.toString(),
@@ -333,7 +340,7 @@ class ReportsService(
                 it.groupName,
                 it.studentId.toString(),
                 it.studentName,
-                studentCategoryTitleRu(it.category),
+                it.category?.name ?: "-",
                 assignedByRoleTitleRu(it.assignedByRole),
                 it.assignedByName ?: "-",
                 yesNo(it.plannedBreakfast),
@@ -348,7 +355,11 @@ class ReportsService(
                 it.breakfastScannedByName ?: "-",
                 yesNo(it.lunchUsed),
                 it.lunchTransactionId?.toString() ?: "-",
-                it.lunchScannedByName ?: "-"
+                it.lunchScannedByName ?: "-",
+                buildNoMealStatusSummary(it.noMealReasonType, it.noMealReasonText),
+                buildAbsencePeriodSummary(it.absenceFrom, it.absenceTo),
+                it.comment ?: "-",
+                studentCategoryTitleRu(it.category),
             ).joinToString(",") { value -> csvEscape(value) }
         }
         return header + body
@@ -372,6 +383,22 @@ class ReportsService(
         NoMealReasonType.SICK_LEAVE -> "Больничный"
         NoMealReasonType.OTHER -> "Иное"
         NoMealReasonType.MISSING_ROSTER -> "Куратор не заполнил табель"
+    }
+
+    private fun buildNoMealStatusSummary(reasonType: NoMealReasonType?, reasonText: String?): String {
+        val status = noMealReasonTypeTitleRu(reasonType)
+        val text = reasonText?.trim().orEmpty()
+        if (status == "-" && text.isBlank()) return "-"
+        if (status == "-") return text
+        if (text.isBlank()) return status
+        return "$status: $text"
+    }
+
+    private fun buildAbsencePeriodSummary(absenceFrom: LocalDate?, absenceTo: LocalDate?): String {
+        if (absenceFrom == null && absenceTo == null) return "-"
+        val from = absenceFrom?.toString() ?: "?"
+        val to = absenceTo?.toString() ?: "?"
+        return "$from - $to"
     }
 
     private fun resolveAccessibleGroups(

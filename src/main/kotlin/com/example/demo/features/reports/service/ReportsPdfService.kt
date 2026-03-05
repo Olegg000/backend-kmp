@@ -1,5 +1,6 @@
 package com.example.demo.features.reports.service
 
+import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.features.reports.dto.AssignedByRole
@@ -46,7 +47,7 @@ class ReportsPdfService(
         document.add(Paragraph("Отчёт по питанию за период $startDate — $endDate", fontHeader))
         document.add(Paragraph(" "))
 
-        val table = PdfPTable(11)
+        val table = PdfPTable(14)
         table.widthPercentage = 100f
         table.setWidths(
             floatArrayOf(
@@ -55,6 +56,9 @@ class ReportsPdfService(
                 2.15f, // Студент
                 1.1f, // Категория
                 2.1f, // Назначил
+                2.2f, // Статус/Причина
+                1.5f, // Период
+                1.8f, // Комментарий
                 0.95f, // Завтрак
                 1.0f, // Tx завтрак
                 2.0f, // Сканировал завтрак
@@ -72,6 +76,9 @@ class ReportsPdfService(
         table.addCell(headerCell("Студент"))
         table.addCell(headerCell("Категория"))
         table.addCell(headerCell("Назначил"))
+        table.addCell(headerCell("Статус/Причина"))
+        table.addCell(headerCell("Период"))
+        table.addCell(headerCell("Комментарий"))
         table.addCell(headerCell("Завтрак"))
         table.addCell(headerCell("TX завтрак"))
         table.addCell(headerCell("Скан. завтрак"))
@@ -93,6 +100,25 @@ class ReportsPdfService(
                     fontNormal
                 )
             )
+            table.addCell(
+                Paragraph(
+                    buildNoMealStatusSummary(
+                        reasonType = it.noMealReasonType,
+                        reasonText = it.noMealReasonText,
+                    ),
+                    fontNormal
+                )
+            )
+            table.addCell(
+                Paragraph(
+                    buildAbsencePeriodSummary(
+                        absenceFrom = it.absenceFrom,
+                        absenceTo = it.absenceTo,
+                    ),
+                    fontNormal
+                )
+            )
+            table.addCell(Paragraph(it.comment ?: "-", fontNormal))
             table.addCell(Paragraph(if (it.breakfastUsed) "Да" else "Нет", fontNormal))
             table.addCell(Paragraph(it.breakfastTransactionId?.toString() ?: "-", fontNormal))
             table.addCell(Paragraph(it.breakfastScannedByName ?: "-", fontNormal))
@@ -116,6 +142,30 @@ class ReportsPdfService(
         null -> "-"
         AssignedByRole.ADMIN -> "Администратор"
         AssignedByRole.CURATOR -> "Куратор"
+    }
+
+    private fun noMealReasonTypeTitleRu(reasonType: NoMealReasonType?): String = when (reasonType) {
+        null -> "-"
+        NoMealReasonType.EXPELLED -> "Отчислен"
+        NoMealReasonType.SICK_LEAVE -> "Больничный"
+        NoMealReasonType.OTHER -> "Иное"
+        NoMealReasonType.MISSING_ROSTER -> "Куратор не заполнил табель"
+    }
+
+    private fun buildNoMealStatusSummary(reasonType: NoMealReasonType?, reasonText: String?): String {
+        val status = noMealReasonTypeTitleRu(reasonType)
+        val text = reasonText?.trim().orEmpty()
+        if (status == "-" && text.isBlank()) return "-"
+        if (status == "-") return text
+        if (text.isBlank()) return status
+        return "$status: $text"
+    }
+
+    private fun buildAbsencePeriodSummary(absenceFrom: LocalDate?, absenceTo: LocalDate?): String {
+        if (absenceFrom == null && absenceTo == null) return "-"
+        val from = absenceFrom?.toString() ?: "?"
+        val to = absenceTo?.toString() ?: "?"
+        return "$from - $to"
     }
 
     private fun buildAssignedByLabel(role: AssignedByRole?, assignedByName: String?): String {

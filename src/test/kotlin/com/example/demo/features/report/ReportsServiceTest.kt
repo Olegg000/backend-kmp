@@ -340,6 +340,8 @@ class ReportsServiceTest(
         assertTrue(csv.startsWith("Дата,ID группы,Группа,ID студента,Студент,Категория,Роль назначившего,ФИО назначившего"))
         assertTrue(csv.contains("ID транзакции завтрака"))
         assertTrue(csv.contains("ФИО сканировавшего обед"))
+        assertTrue(csv.contains("Категория (RU)"))
+        assertTrue(csv.contains("Многодетные"))
         assertTrue(csv.contains("ИСП-21"))
         assertTrue(csv.contains("ИСП-22"))
     }
@@ -368,8 +370,12 @@ class ReportsServiceTest(
             assignedByRoleFilter = AssignedByRoleFilter.ALL
         )
 
-        assertTrue(summary.totalBreakfastCount >= 2)
-        assertTrue(summary.totalLunchCount >= 1)
+        assertEquals(2, summary.totalBreakfastCount)
+        assertEquals(1, summary.totalLunchCount)
+        assertEquals(1, summary.totalBothCount)
+        assertEquals(2, summary.usedBreakfastCount)
+        assertEquals(0, summary.usedLunchCount)
+        assertEquals(0, summary.usedBothCount)
         assertTrue(summary.zeroFillCurators.any { it.curatorId == curator.id })
     }
 }

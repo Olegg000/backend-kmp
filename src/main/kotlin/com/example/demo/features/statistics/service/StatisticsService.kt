@@ -9,6 +9,7 @@ import com.example.demo.core.exception.BusinessException
 import com.example.demo.features.statistics.dto.StudentMealStatus
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -20,6 +21,14 @@ class StatisticsService(
 ) {
 
     fun getGroupMealStatus(curatorLogin: String, date: LocalDate, groupId: Int? = null): List<StudentMealStatus> {
+        if (date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY) {
+            throw BusinessException(
+                code = "STATS_WEEKEND_FORBIDDEN",
+                userMessage = "Статистика доступна только для дней Пн–Пт.",
+                status = HttpStatus.BAD_REQUEST,
+            )
+        }
+
         val curator = userRepository.findByLogin(curatorLogin)
             ?: throw BusinessException(
                 code = "CURATOR_NOT_FOUND",

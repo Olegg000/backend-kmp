@@ -20,6 +20,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpStatus
 import org.springframework.test.context.ActiveProfiles
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -204,5 +205,18 @@ class StatisticsServiceTest(
         }
         assertEquals("CURATOR_GROUP_ACCESS_DENIED", ex.code)
         assertEquals(HttpStatus.FORBIDDEN, ex.status)
+    }
+
+    @Test
+    @DisplayName("Статистика за выходные запрещена")
+    fun `getGroupMealStatus rejects weekend dates`() {
+        val saturday = generateSequence(LocalDate.now()) { it.plusDays(1) }
+            .first { it.dayOfWeek == DayOfWeek.SATURDAY }
+
+        val ex = assertThrows(BusinessException::class.java) {
+            statisticsService.getGroupMealStatus(curator.login, saturday)
+        }
+        assertEquals("STATS_WEEKEND_FORBIDDEN", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
     }
 }

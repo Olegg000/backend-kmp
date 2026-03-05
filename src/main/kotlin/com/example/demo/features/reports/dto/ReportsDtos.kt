@@ -66,6 +66,9 @@ data class ConsumptionSummaryResponse(
     val totalBreakfastCount: Int,
     val totalLunchCount: Int,
     val totalBothCount: Int,
+    val usedBreakfastCount: Int,
+    val usedLunchCount: Int,
+    val usedBothCount: Int,
     val missingRosterRowsCount: Int,
     val zeroFillCurators: List<ZeroFillCuratorSummary>,
 )

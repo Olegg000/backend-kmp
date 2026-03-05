@@ -9,6 +9,7 @@ import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
+import com.example.demo.core.database.repository.WeeklyReportSnapshotRepository
 import com.example.demo.features.qr.service.ChefDataService
 import com.example.demo.features.roster.service.RosterWeekPolicy
 import com.example.demo.features.roster.service.WeeklyRosterFreezeService
@@ -34,47 +35,44 @@ import java.time.ZoneId
     ChefDataService::class,
     WeeklyRosterFreezeService::class,
     RosterWeekPolicy::class,
-    ChefWeeklyReportServiceTest.FixedFridayClockConfig::class,
+    ChefWeeklyReportRealtimeServiceTest.FixedThursdayClockConfig::class,
 )
 @ActiveProfiles(resolver = TestProfileResolver::class)
-@DisplayName("Chef weekly report - snapshot and confirmation")
-class ChefWeeklyReportServiceTest(
+@DisplayName("Chef weekly report - realtime before lock")
+class ChefWeeklyReportRealtimeServiceTest(
     @Autowired private val chefDataService: ChefDataService,
-    @Autowired private val weeklyRosterFreezeService: WeeklyRosterFreezeService,
     @Autowired private val rosterWeekPolicy: RosterWeekPolicy,
     @Autowired private val groupRepository: GroupRepository,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val mealPermissionRepository: MealPermissionRepository,
+    @Autowired private val weeklyReportSnapshotRepository: WeeklyReportSnapshotRepository,
 ) {
+
     @TestConfiguration
-    class FixedFridayClockConfig {
+    class FixedThursdayClockConfig {
         @Bean
         fun businessZoneId(): ZoneId = ZoneId.of("Europe/Samara")
 
         @Bean
         fun businessClock(zoneId: ZoneId): Clock =
-            Clock.fixed(Instant.parse("2026-03-06T09:30:00Z"), zoneId) // 12:30 Самара
+            Clock.fixed(Instant.parse("2026-03-05T07:00:00Z"), zoneId) // 10:00 Самара (до дедлайна)
     }
 
-
-    private lateinit var group: GroupEntity
-    private lateinit var curator: UserEntity
-    private lateinit var chef: UserEntity
-    private lateinit var student: UserEntity
     private lateinit var weekStart: LocalDate
+    private lateinit var chef: UserEntity
 
     @BeforeEach
     fun setup() {
-        group = groupRepository.save(GroupEntity(groupName = "ИСП-31"))
-        curator = userRepository.save(
+        val group = groupRepository.save(GroupEntity(groupName = "ИСП-RT"))
+        val curator = userRepository.save(
             UserEntity(
-                login = "curator-weekly",
+                login = "curator-weekly-rt",
                 passwordHash = "h",
                 roles = mutableSetOf(Role.CURATOR),
                 name = "Мария",
                 surname = "Классова",
-                fatherName = "Т",
-                group = group
+                fatherName = "Р",
+                group = group,
             )
         )
         group.curators = mutableSetOf(curator)
@@ -82,25 +80,25 @@ class ChefWeeklyReportServiceTest(
 
         chef = userRepository.save(
             UserEntity(
-                login = "chef-weekly",
+                login = "chef-weekly-rt",
                 passwordHash = "h",
                 roles = mutableSetOf(Role.CHEF),
                 name = "Повар",
-                surname = "Тестовый",
-                fatherName = "П"
+                surname = "Реалтаймов",
+                fatherName = "Т",
             )
         )
 
-        student = userRepository.save(
+        val student = userRepository.save(
             UserEntity(
-                login = "student-weekly",
+                login = "student-weekly-rt",
                 passwordHash = "h",
                 roles = mutableSetOf(Role.STUDENT),
                 name = "Иван",
                 surname = "Студентов",
                 fatherName = "И",
                 group = group,
-                studentCategory = StudentCategory.SVO
+                studentCategory = StudentCategory.SVO,
             )
         )
 
@@ -128,26 +126,16 @@ class ChefWeeklyReportServiceTest(
     }
 
     @Test
-    fun `weekly report built from snapshot without personal data`() {
-        weeklyRosterFreezeService.freezeWeek(weekStart)
+    fun `next week report is built from live permissions before lock`() {
+        assertTrue(weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(weekStart).isEmpty())
+
         val report = chefDataService.getWeeklyReport(chef.login, weekStart)
 
-        assertEquals(weekStart, report.weekStart)
+        assertEquals(5, report.days.size)
         assertEquals(2, report.totalBreakfastCount)
         assertEquals(1, report.totalLunchCount)
         assertEquals(1, report.totalBothCount)
-        assertEquals(5, report.days.size)
         assertFalse(report.confirmed)
-        assertTrue(report.days.all { it.breakfastCount >= 0 && it.lunchCount >= 0 && it.bothCount >= 0 })
-    }
-
-    @Test
-    fun `chef can confirm weekly report`() {
-        weeklyRosterFreezeService.freezeWeek(weekStart)
-        chefDataService.confirmWeeklyReport(chef.login, weekStart)
-
-        val report = chefDataService.getWeeklyReport(chef.login, weekStart)
-        assertTrue(report.confirmed)
-        assertTrue(report.confirmedAt != null)
+        assertTrue(weeklyReportSnapshotRepository.findAllByWeekStartOrderByDateAsc(weekStart).isEmpty())
     }
 }

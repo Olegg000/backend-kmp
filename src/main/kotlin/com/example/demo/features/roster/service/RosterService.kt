@@ -285,6 +285,12 @@ class RosterService(
 
         if (testModeEnabled) {
             val nextWeek = rosterWeekPolicy.nextWeekStart()
+            if (targetWeek.isBefore(nextWeek)) {
+                throw BusinessException(
+                    code = "ROSTER_ONLY_NEXT_WEEK_OR_LATER",
+                    userMessage = "Текущая неделя доступна только для просмотра. Заполнять можно со следующей недели.",
+                )
+            }
             if (targetWeek == nextWeek && !rosterWeekPolicy.isDateEditable(date)) {
                 throw BusinessException(
                     code = "ROSTER_WEEK_LOCKED",
