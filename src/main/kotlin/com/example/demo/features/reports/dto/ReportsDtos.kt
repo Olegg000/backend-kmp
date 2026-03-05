@@ -12,6 +12,12 @@ enum class AssignedByRoleFilter {
     CURATOR
 }
 
+enum class ReportAccessScope {
+    AUTO,
+    ADMIN,
+    CURATOR,
+}
+
 enum class AssignedByRole {
     ADMIN,
     CURATOR

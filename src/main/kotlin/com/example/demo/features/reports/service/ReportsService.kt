@@ -19,6 +19,7 @@ import com.example.demo.core.logging.maskUuid
 import com.example.demo.features.reports.dto.AssignedByRole
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.dto.ConsumptionReportRow
+import com.example.demo.features.reports.dto.ReportAccessScope
 import com.example.demo.features.reports.dto.ConsumptionSummaryDay
 import com.example.demo.features.reports.dto.ConsumptionSummaryResponse
 import com.example.demo.features.reports.dto.ZeroFillCuratorSummary
@@ -48,7 +49,8 @@ class ReportsService(
         startDate: LocalDate,
         endDate: LocalDate,
         groupId: Int?,
-        assignedByRoleFilter: AssignedByRoleFilter
+        assignedByRoleFilter: AssignedByRoleFilter,
+        accessScope: ReportAccessScope = ReportAccessScope.AUTO,
     ): List<ConsumptionReportRow> {
         val loginMasked = maskLogin(currentLogin)
         var currentUserId: UUID? = null
@@ -79,7 +81,12 @@ class ReportsService(
                 assignedByRoleFilter
             )
 
-            val groups = resolveAccessibleGroups(currentUser.roles, currentUser.id, groupId)
+            val groups = resolveAccessibleGroups(
+                roles = currentUser.roles,
+                userId = currentUser.id,
+                groupId = groupId,
+                accessScope = accessScope,
+            )
             logger.info(
                 "Resolved accessible groups for report: loginMasked={}, groupsCount={}, groupIds={}",
                 loginMasked,
@@ -234,6 +241,7 @@ class ReportsService(
         endDate: LocalDate,
         groupId: Int?,
         assignedByRoleFilter: AssignedByRoleFilter,
+        accessScope: ReportAccessScope = ReportAccessScope.AUTO,
     ): ConsumptionSummaryResponse {
         if (endDate.isBefore(startDate)) {
             throw BusinessException(
@@ -249,6 +257,7 @@ class ReportsService(
             endDate = endDate,
             groupId = groupId,
             assignedByRoleFilter = assignedByRoleFilter,
+            accessScope = accessScope,
         )
 
         val days = buildDateRange(startDate, endDate).map { date ->
@@ -324,9 +333,17 @@ class ReportsService(
         startDate: LocalDate,
         endDate: LocalDate,
         groupId: Int?,
-        assignedByRoleFilter: AssignedByRoleFilter
+        assignedByRoleFilter: AssignedByRoleFilter,
+        accessScope: ReportAccessScope = ReportAccessScope.AUTO,
     ): String {
-        val rows = generateConsumptionReport(currentLogin, startDate, endDate, groupId, assignedByRoleFilter)
+        val rows = generateConsumptionReport(
+            currentLogin = currentLogin,
+            startDate = startDate,
+            endDate = endDate,
+            groupId = groupId,
+            assignedByRoleFilter = assignedByRoleFilter,
+            accessScope = accessScope,
+        )
         val header =
             "Дата,ID группы,Группа,ID студента,Студент,Категория,Куратор," +
                 "План завтрак,План обед,Причина непитания,Текст причины,Период с,Период по,Комментарий," +
@@ -400,35 +417,37 @@ class ReportsService(
     private fun resolveAccessibleGroups(
         roles: Set<Role>,
         userId: UUID?,
-        groupId: Int?
+        groupId: Int?,
+        accessScope: ReportAccessScope,
     ): List<GroupEntity> {
+        if (accessScope == ReportAccessScope.CURATOR) {
+            if (!roles.contains(Role.CURATOR)) {
+                throw BusinessException(
+                    code = "REPORT_ACCESS_DENIED",
+                    userMessage = "Недостаточно прав для просмотра отчетов куратора",
+                    status = HttpStatus.FORBIDDEN,
+                )
+            }
+            return resolveCuratorGroups(userId, groupId)
+        }
+
+        if (accessScope == ReportAccessScope.ADMIN) {
+            if (!roles.contains(Role.ADMIN)) {
+                throw BusinessException(
+                    code = "REPORT_ACCESS_DENIED",
+                    userMessage = "Недостаточно прав для просмотра админских отчетов",
+                    status = HttpStatus.FORBIDDEN,
+                )
+            }
+            return resolveAdminGroups(groupId)
+        }
+
         if (roles.contains(Role.ADMIN)) {
-            if (groupId == null) return groupRepository.findAll()
-            return listOf(
-                groupRepository.findById(groupId).orElseThrow {
-                    BusinessException(
-                        code = "GROUP_NOT_FOUND",
-                        userMessage = "Группа не найдена",
-                        status = HttpStatus.NOT_FOUND,
-                    )
-                }
-            )
+            return resolveAdminGroups(groupId)
         }
 
         if (roles.contains(Role.CURATOR)) {
-            val curatorId = userId ?: throw BusinessException(
-                code = "CURATOR_ID_MISSING",
-                userMessage = "У куратора отсутствует идентификатор",
-                status = HttpStatus.CONFLICT,
-            )
-            val groups = groupRepository.findAllByCuratorId(curatorId)
-            if (groupId == null) return groups
-            val target = groups.firstOrNull { it.id == groupId } ?: throw BusinessException(
-                code = "CURATOR_GROUP_ACCESS_DENIED",
-                userMessage = "Группа недоступна куратору",
-                status = HttpStatus.FORBIDDEN,
-            )
-            return listOf(target)
+            return resolveCuratorGroups(userId, groupId)
         }
 
         throw BusinessException(
@@ -436,6 +455,35 @@ class ReportsService(
             userMessage = "Недостаточно прав для просмотра отчетов",
             status = HttpStatus.FORBIDDEN,
         )
+    }
+
+    private fun resolveAdminGroups(groupId: Int?): List<GroupEntity> {
+        if (groupId == null) return groupRepository.findAll()
+        return listOf(
+            groupRepository.findById(groupId).orElseThrow {
+                BusinessException(
+                    code = "GROUP_NOT_FOUND",
+                    userMessage = "Группа не найдена",
+                    status = HttpStatus.NOT_FOUND,
+                )
+            }
+        )
+    }
+
+    private fun resolveCuratorGroups(userId: UUID?, groupId: Int?): List<GroupEntity> {
+        val curatorId = userId ?: throw BusinessException(
+            code = "CURATOR_ID_MISSING",
+            userMessage = "У куратора отсутствует идентификатор",
+            status = HttpStatus.CONFLICT,
+        )
+        val groups = groupRepository.findAllByCuratorId(curatorId)
+        if (groupId == null) return groups
+        val target = groups.firstOrNull { it.id == groupId } ?: throw BusinessException(
+            code = "CURATOR_GROUP_ACCESS_DENIED",
+            userMessage = "Группа недоступна куратору",
+            status = HttpStatus.FORBIDDEN,
+        )
+        return listOf(target)
     }
 
     private fun resolveAssignedByRole(permission: MealPermissionEntity): AssignedByRole {

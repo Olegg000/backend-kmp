@@ -20,6 +20,7 @@ class GroupController(
 ) {
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'REGISTRATOR')")
     @Operation(summary = "Получить список всех групп")
     fun getAll(): List<GroupResponse> {
         return groupService.getAllGroups()

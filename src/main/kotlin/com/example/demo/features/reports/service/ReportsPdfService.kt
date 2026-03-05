@@ -2,6 +2,7 @@ package com.example.demo.features.reports.service
 
 import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
+import com.example.demo.features.reports.dto.ReportAccessScope
 import com.example.demo.core.database.StudentCategory
 import com.lowagie.text.Document
 import com.lowagie.text.Font
@@ -25,14 +26,16 @@ class ReportsPdfService(
         startDate: LocalDate,
         endDate: LocalDate,
         groupId: Int?,
-        assignedByRoleFilter: AssignedByRoleFilter
+        assignedByRoleFilter: AssignedByRoleFilter,
+        accessScope: ReportAccessScope = ReportAccessScope.AUTO,
     ): ByteArray {
         val rows = reportsService.generateConsumptionReport(
             currentLogin = currentLogin,
             startDate = startDate,
             endDate = endDate,
             groupId = groupId,
-            assignedByRoleFilter = assignedByRoleFilter
+            assignedByRoleFilter = assignedByRoleFilter,
+            accessScope = accessScope,
         )
 
         val baos = ByteArrayOutputStream()

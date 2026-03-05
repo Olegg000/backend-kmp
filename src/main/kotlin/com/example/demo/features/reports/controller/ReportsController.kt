@@ -4,6 +4,7 @@ import com.example.demo.core.logging.maskLogin
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.features.reports.dto.ConsumptionReportRow
 import com.example.demo.features.reports.dto.ConsumptionSummaryResponse
+import com.example.demo.features.reports.dto.ReportAccessScope
 import com.example.demo.features.reports.service.ReportsPdfService
 import com.example.demo.features.reports.service.ReportsService
 import io.swagger.v3.oas.annotations.Operation
@@ -42,19 +43,21 @@ class ReportsController(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
         @RequestParam(required = false) groupId: Int?,
-        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter,
+        @RequestParam(defaultValue = "AUTO") accessScope: ReportAccessScope,
     ): List<ConsumptionReportRow> {
         val startedAtNanos = System.nanoTime()
         val loginMasked = maskLogin(principal.name)
         val roles = currentRoles()
         logger.info(
-            "Consumption report request started: loginMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRole={}",
+            "Consumption report request started: loginMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRole={}, accessScope={}",
             loginMasked,
             roles,
             startDate,
             endDate,
             groupId,
-            assignedByRole
+            assignedByRole,
+            accessScope,
         )
         try {
             val rows = reportsService.generateConsumptionReport(
@@ -62,7 +65,8 @@ class ReportsController(
                 startDate = startDate,
                 endDate = endDate,
                 groupId = groupId,
-                assignedByRoleFilter = assignedByRole
+                assignedByRoleFilter = assignedByRole,
+                accessScope = accessScope,
             )
             val durationMs = ((System.nanoTime() - startedAtNanos).toDouble() / 1_000_000.0).roundToLong()
             logger.info(
@@ -98,14 +102,16 @@ class ReportsController(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
         @RequestParam(required = false) groupId: Int?,
-        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter,
+        @RequestParam(defaultValue = "AUTO") accessScope: ReportAccessScope,
     ): ConsumptionSummaryResponse {
         return reportsService.generateConsumptionSummary(
             currentLogin = principal.name,
             startDate = startDate,
             endDate = endDate,
             groupId = groupId,
-            assignedByRoleFilter = assignedByRole
+            assignedByRoleFilter = assignedByRole,
+            accessScope = accessScope,
         )
     }
 
@@ -117,23 +123,26 @@ class ReportsController(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
         @RequestParam(required = false) groupId: Int?,
-        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter,
+        @RequestParam(defaultValue = "AUTO") accessScope: ReportAccessScope,
     ): ResponseEntity<ByteArray> {
         logger.info(
-            "Consumption CSV export started: loginMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRole={}",
+            "Consumption CSV export started: loginMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRole={}, accessScope={}",
             maskLogin(principal.name),
             currentRoles(),
             startDate,
             endDate,
             groupId,
-            assignedByRole
+            assignedByRole,
+            accessScope,
         )
         val csv = reportsService.exportToCsv(
             currentLogin = principal.name,
             startDate = startDate,
             endDate = endDate,
             groupId = groupId,
-            assignedByRoleFilter = assignedByRole
+            assignedByRoleFilter = assignedByRole,
+            accessScope = accessScope,
         )
         logger.info(
             "Consumption CSV export completed: loginMasked={}, bytes={}",
@@ -155,23 +164,26 @@ class ReportsController(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) startDate: LocalDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) endDate: LocalDate,
         @RequestParam(required = false) groupId: Int?,
-        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter
+        @RequestParam(defaultValue = "ALL") assignedByRole: AssignedByRoleFilter,
+        @RequestParam(defaultValue = "AUTO") accessScope: ReportAccessScope,
     ): ResponseEntity<ByteArray> {
         logger.info(
-            "Consumption PDF export started: loginMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRole={}",
+            "Consumption PDF export started: loginMasked={}, roles={}, startDate={}, endDate={}, groupId={}, assignedByRole={}, accessScope={}",
             maskLogin(principal.name),
             currentRoles(),
             startDate,
             endDate,
             groupId,
-            assignedByRole
+            assignedByRole,
+            accessScope,
         )
         val pdf = reportsPdfService.generateConsumptionPdf(
             currentLogin = principal.name,
             startDate = startDate,
             endDate = endDate,
             groupId = groupId,
-            assignedByRoleFilter = assignedByRole
+            assignedByRoleFilter = assignedByRole,
+            accessScope = accessScope,
         )
         logger.info(
             "Consumption PDF export completed: loginMasked={}, bytes={}",
