@@ -8,6 +8,7 @@ import com.example.demo.core.database.repository.GroupRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -70,6 +71,38 @@ class ReportsConsumptionControllerSmokeTest(
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect {
                 assertFalse(it.response.contentAsString.isBlank(), "Ответ consumption отчета не должен быть пустым")
+            }
+    }
+
+    @Test
+    fun `consumption report rejects future end date`() {
+        val admin = userRepository.save(
+            UserEntity(
+                login = "admin-future-${UUID.randomUUID()}",
+                passwordHash = "h",
+                roles = mutableSetOf(Role.ADMIN),
+                name = "Future",
+                surname = "Admin",
+                fatherName = "Test",
+            )
+        )
+        val token = jwtUtils.generateToken(admin.login, admin.roles)
+        val today = LocalDate.now()
+        val tomorrow = today.plusDays(1)
+
+        mockMvc.perform(
+            get("/api/v1/reports/consumption")
+                .header("Authorization", "Bearer $token")
+                .param("startDate", today.toString())
+                .param("endDate", tomorrow.toString())
+                .param("assignedByRole", "ALL")
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect {
+                assertTrue(
+                    it.response.contentAsString.contains("FUTURE_REPORT_DATE_NOT_ALLOWED"),
+                    "Должен вернуться код FUTURE_REPORT_DATE_NOT_ALLOWED"
+                )
             }
     }
 }

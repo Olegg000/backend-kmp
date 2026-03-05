@@ -62,6 +62,14 @@ class ReportsService(
                     status = HttpStatus.BAD_REQUEST,
                 )
             }
+            val today = rosterWeekPolicy.today()
+            if (startDate.isAfter(today) || endDate.isAfter(today)) {
+                throw BusinessException(
+                    code = "FUTURE_REPORT_DATE_NOT_ALLOWED",
+                    userMessage = "Отчет можно формировать только по текущую дату",
+                    status = HttpStatus.BAD_REQUEST,
+                )
+            }
 
             val currentUser = userRepository.findByLogin(currentLogin)
                 ?: throw BusinessException(
@@ -344,6 +352,7 @@ class ReportsService(
             assignedByRoleFilter = assignedByRoleFilter,
             accessScope = accessScope,
         )
+        val totals = calculateReportTotals(rows)
         val header =
             "Дата,ID группы,Группа,ID студента,Студент,Категория,Куратор," +
                 "План завтрак,План обед,Причина непитания,Текст причины,Период с,Период по,Комментарий," +
@@ -378,7 +387,64 @@ class ReportsService(
                 studentCategoryTitleRu(it.category),
             ).joinToString(",") { value -> csvEscape(value) }
         }
-        return header + body
+        val summaryRows = listOf(
+            csvLine("ИТОГИ"),
+            csvLine("Блок", "Метрика", "Значение", "Пояснение"),
+            csvLine("ПО ФАКТУ", "Завтраки (количество питаний за все дни)", totals.factBreakfastCount.toString(), "Сумма по дням"),
+            csvLine("ПО ФАКТУ", "Обеды (количество питаний за все дни)", totals.factLunchCount.toString(), "Сумма по дням"),
+            csvLine("ПО ФАКТУ", "Завтрак и обед", totals.factBothCount.toString(), "Строки, где были оба факта"),
+            csvLine("ПО ФАКТУ", "Всего питаний за все дни", totals.factMealEventsTotal.toString(), "Завтраки + обеды"),
+            csvLine("ПО ФАКТУ", "Уникальных студентов питалось", totals.factUniqueStudentsCount.toString(), "Без повторов за период"),
+            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтраки (количество назначений за все дни)", totals.plannedBreakfastCount.toString(), "Сумма по дням"),
+            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Обеды (количество назначений за все дни)", totals.plannedLunchCount.toString(), "Сумма по дням"),
+            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтрак и обед", totals.plannedBothCount.toString(), "Строки, где назначены оба приема"),
+            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Всего назначений за все дни", totals.plannedMealEventsTotal.toString(), "Завтраки + обеды"),
+            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Уникальных студентов с назначением", totals.plannedUniqueStudentsCount.toString(), "Без повторов за период"),
+        )
+
+        return buildString {
+            append(header)
+            if (body.isNotBlank()) {
+                append(body)
+            }
+            append("\n\n")
+            append(summaryRows.joinToString("\n"))
+        }
+    }
+
+    internal fun calculateReportTotals(rows: List<ConsumptionReportRow>): ReportTotals {
+        val factBreakfastCount = rows.count { it.breakfastUsed }
+        val factLunchCount = rows.count { it.lunchUsed }
+        val factBothCount = rows.count { it.breakfastUsed && it.lunchUsed }
+        val factMealEventsTotal = factBreakfastCount + factLunchCount
+        val factUniqueStudentsCount = rows.asSequence()
+            .filter { it.breakfastUsed || it.lunchUsed }
+            .map { it.studentId }
+            .toSet()
+            .size
+
+        val plannedBreakfastCount = rows.count { it.plannedBreakfast }
+        val plannedLunchCount = rows.count { it.plannedLunch }
+        val plannedBothCount = rows.count { it.plannedBreakfast && it.plannedLunch }
+        val plannedMealEventsTotal = plannedBreakfastCount + plannedLunchCount
+        val plannedUniqueStudentsCount = rows.asSequence()
+            .filter { it.plannedBreakfast || it.plannedLunch }
+            .map { it.studentId }
+            .toSet()
+            .size
+
+        return ReportTotals(
+            factBreakfastCount = factBreakfastCount,
+            factLunchCount = factLunchCount,
+            factBothCount = factBothCount,
+            factMealEventsTotal = factMealEventsTotal,
+            factUniqueStudentsCount = factUniqueStudentsCount,
+            plannedBreakfastCount = plannedBreakfastCount,
+            plannedLunchCount = plannedLunchCount,
+            plannedBothCount = plannedBothCount,
+            plannedMealEventsTotal = plannedMealEventsTotal,
+            plannedUniqueStudentsCount = plannedUniqueStudentsCount,
+        )
     }
 
     private fun studentCategoryTitleRu(category: StudentCategory?): String = when (category) {
@@ -522,6 +588,8 @@ class ReportsService(
 
     private fun csvEscape(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 
+    private fun csvLine(vararg values: String): String = values.joinToString(",") { csvEscape(it) }
+
     private data class StudentDateKey(
         val studentId: UUID,
         val date: LocalDate
@@ -533,3 +601,16 @@ class ReportsService(
         val mealType: MealType
     )
 }
+
+internal data class ReportTotals(
+    val factBreakfastCount: Int,
+    val factLunchCount: Int,
+    val factBothCount: Int,
+    val factMealEventsTotal: Int,
+    val factUniqueStudentsCount: Int,
+    val plannedBreakfastCount: Int,
+    val plannedLunchCount: Int,
+    val plannedBothCount: Int,
+    val plannedMealEventsTotal: Int,
+    val plannedUniqueStudentsCount: Int,
+)

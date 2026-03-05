@@ -37,6 +37,7 @@ class ReportsPdfService(
             assignedByRoleFilter = assignedByRoleFilter,
             accessScope = accessScope,
         )
+        val totals = reportsService.calculateReportTotals(rows)
 
         val baos = ByteArrayOutputStream()
         val document = Document(PageSize.A4.rotate())
@@ -129,8 +130,47 @@ class ReportsPdfService(
         }
 
         document.add(table)
+        document.add(Paragraph(" "))
+        document.add(Paragraph("ИТОГИ", fontHeader))
+        document.add(Paragraph(" "))
+        document.add(buildTotalsTable(totals, fontNormal))
         document.close()
         return baos.toByteArray()
+    }
+
+    private fun buildTotalsTable(totals: ReportTotals, fontNormal: Font): PdfPTable {
+        val table = PdfPTable(4)
+        table.widthPercentage = 100f
+        table.setWidths(floatArrayOf(1.7f, 3.2f, 1.2f, 2.2f))
+
+        fun headerCell(text: String): PdfPCell =
+            PdfPCell(Paragraph(text, fontNormal)).apply { backgroundColor = Color.LIGHT_GRAY }
+
+        fun addRow(block: String, metric: String, value: Int, hint: String) {
+            table.addCell(Paragraph(block, fontNormal))
+            table.addCell(Paragraph(metric, fontNormal))
+            table.addCell(Paragraph(value.toString(), fontNormal))
+            table.addCell(Paragraph(hint, fontNormal))
+        }
+
+        table.addCell(headerCell("Блок"))
+        table.addCell(headerCell("Метрика"))
+        table.addCell(headerCell("Значение"))
+        table.addCell(headerCell("Пояснение"))
+
+        addRow("ПО ФАКТУ", "Завтраки (количество питаний за все дни)", totals.factBreakfastCount, "Сумма по дням")
+        addRow("ПО ФАКТУ", "Обеды (количество питаний за все дни)", totals.factLunchCount, "Сумма по дням")
+        addRow("ПО ФАКТУ", "Завтрак и обед", totals.factBothCount, "Строки, где были оба факта")
+        addRow("ПО ФАКТУ", "Всего питаний за все дни", totals.factMealEventsTotal, "Завтраки + обеды")
+        addRow("ПО ФАКТУ", "Уникальных студентов питалось", totals.factUniqueStudentsCount, "Без повторов за период")
+
+        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтраки (количество назначений за все дни)", totals.plannedBreakfastCount, "Сумма по дням")
+        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Обеды (количество назначений за все дни)", totals.plannedLunchCount, "Сумма по дням")
+        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтрак и обед", totals.plannedBothCount, "Строки, где назначены оба приема")
+        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Всего назначений за все дни", totals.plannedMealEventsTotal, "Завтраки + обеды")
+        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Уникальных студентов с назначением", totals.plannedUniqueStudentsCount, "Без повторов за период")
+
+        return table
     }
 
     private fun studentCategoryTitleRu(category: StudentCategory?): String = when (category) {

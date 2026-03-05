@@ -35,6 +35,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 @DataJpaTest
 @Import(ReportsService::class, RosterWeekPolicy::class, TimeConfig::class)
@@ -344,6 +345,32 @@ class ReportsServiceTest(
         assertTrue(csv.contains("Многодетные"))
         assertTrue(csv.contains("ИСП-21"))
         assertTrue(csv.contains("ИСП-22"))
+        assertTrue(csv.contains("\"ИТОГИ\""))
+        assertTrue(csv.contains("\"ПО ФАКТУ\""))
+        assertTrue(csv.contains("\"ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ\""))
+        assertTrue(csv.contains("Завтраки (количество питаний за все дни)\",\"2\""))
+        assertTrue(csv.contains("Уникальных студентов питалось\",\"2\""))
+        assertTrue(csv.contains("Всего назначений за все дни\",\"3\""))
+        assertTrue(csv.contains("Уникальных студентов с назначением\",\"2\""))
+    }
+
+    @Test
+    @DisplayName("Отчет не формируется на будущую дату")
+    fun `future dates are forbidden for report`() {
+        val tomorrow = LocalDate.now().plus(1, ChronoUnit.DAYS)
+
+        val ex = assertThrows(BusinessException::class.java) {
+            reportsService.generateConsumptionReport(
+                currentLogin = admin.login,
+                startDate = tomorrow,
+                endDate = tomorrow,
+                groupId = null,
+                assignedByRoleFilter = AssignedByRoleFilter.ALL,
+            )
+        }
+
+        assertEquals("FUTURE_REPORT_DATE_NOT_ALLOWED", ex.code)
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status)
     }
 
     @Test
