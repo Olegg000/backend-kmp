@@ -48,6 +48,7 @@ Demo logins:
 - `stud_Group-101_5`
 - `stud_Group-102_1`
 - `stud_Group-102_2`
+- `student_test` (Group-101, breakfast + lunch for quick login checks)
 
 Enable in `.env`:
 

@@ -197,6 +197,19 @@ class TestModeDemoDataInitializer(
             ),
             groupsByName = groupsByName,
         )
+        val studentTest = upsertUser(
+            spec = DemoUserSpec(
+                login = LOGIN_STUDENT_TEST,
+                roles = setOf(Role.STUDENT),
+                name = "Тест",
+                surname = "Студент",
+                fatherName = "Тестович",
+                groupName = "Group-101",
+                studentCategory = StudentCategory.SVO,
+                accountStatus = AccountStatus.ACTIVE,
+            ),
+            groupsByName = groupsByName,
+        )
 
         val curatorId = curator.id
         if (curatorId != null && group101.curators.none { it.id == curatorId }) {
@@ -205,6 +218,7 @@ class TestModeDemoDataInitializer(
         }
 
         ensureAdminTodayPermission(admin)
+        ensureStudentTodayPermission(curator = curator, student = studentTest)
 
         val currentWeekStart = rosterWeekPolicy.weekStart(rosterWeekPolicy.today())
         val previousWeekStart = currentWeekStart.minusWeeks(1)
@@ -223,6 +237,7 @@ class TestModeDemoDataInitializer(
             student1015 = student1015,
             student1021 = student1021,
             student1022 = student1022,
+            studentTest = studentTest,
         )
         seedTransactions(
             seedDates = seedDates,
@@ -231,7 +246,7 @@ class TestModeDemoDataInitializer(
         )
 
         log.warn(
-            "Test-mode demo seed applied: users={}, groups=[{}, {}], dateRange={}..{}, accounts=[{}, {}, {}, {}]",
+            "Test-mode demo seed applied: users={}, groups=[{}, {}], dateRange={}..{}, accounts=[{}, {}, {}, {}, {}]",
             userRepository.count(),
             group101.groupName,
             group102.groupName,
@@ -241,6 +256,7 @@ class TestModeDemoDataInitializer(
             chef.login,
             registrator.login,
             curator.login,
+            studentTest.login,
         )
     }
 
@@ -320,6 +336,7 @@ class TestModeDemoDataInitializer(
         student1015: UserEntity,
         student1021: UserEntity,
         student1022: UserEntity,
+        studentTest: UserEntity,
     ) {
         val demoStudents = listOf(
             student1011,
@@ -329,6 +346,7 @@ class TestModeDemoDataInitializer(
             student1015,
             student1021,
             student1022,
+            studentTest,
         )
         val startDate = seedDates.firstOrNull() ?: return
         val endDate = seedDates.lastOrNull() ?: return
@@ -391,6 +409,14 @@ class TestModeDemoDataInitializer(
                 isBreakfastAllowed = true,
                 isLunchAllowed = false,
             )
+            seededPermissions += MealPermissionEntity(
+                date = date,
+                student = studentTest,
+                assignedBy = curator,
+                reason = "Тестовый студент: завтрак и обед",
+                isBreakfastAllowed = true,
+                isLunchAllowed = true,
+            )
         }
 
         mealPermissionRepository.saveAll(seededPermissions)
@@ -408,6 +434,29 @@ class TestModeDemoDataInitializer(
         )
 
         permission.reason = "Автовыдача талонов администратору в test-mode"
+        permission.isBreakfastAllowed = true
+        permission.isLunchAllowed = true
+        permission.noMealReasonType = null
+        permission.noMealReasonText = null
+        permission.absenceFrom = null
+        permission.absenceTo = null
+        permission.comment = null
+
+        mealPermissionRepository.save(permission)
+    }
+
+    private fun ensureStudentTodayPermission(curator: UserEntity, student: UserEntity) {
+        val today = rosterWeekPolicy.today()
+        val permission = mealPermissionRepository.findByStudentAndDate(student, today) ?: MealPermissionEntity(
+            date = today,
+            student = student,
+            assignedBy = curator,
+            reason = "Тестовый студент для входа: завтрак и обед",
+            isBreakfastAllowed = true,
+            isLunchAllowed = true,
+        )
+
+        permission.reason = "Тестовый студент для входа: завтрак и обед"
         permission.isBreakfastAllowed = true
         permission.isLunchAllowed = true
         permission.noMealReasonType = null
@@ -487,5 +536,6 @@ class TestModeDemoDataInitializer(
         const val LOGIN_CHEF = "chef_main"
         const val LOGIN_REGISTRATOR = "registrator"
         const val LOGIN_CURATOR_101 = "curator_Group-101"
+        const val LOGIN_STUDENT_TEST = "student_test"
     }
 }

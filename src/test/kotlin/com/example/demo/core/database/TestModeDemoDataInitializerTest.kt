@@ -86,6 +86,14 @@ class TestModeDemoDataInitializerTest {
         assertNotNull(group102)
         assertFalse(group101!!.curators.isEmpty(), "Group-101 должен иметь куратора")
 
+        val studentReady = userRepository.findByLogin("student_test")!!
+        assertNotNull(studentReady.group, "student_test должен быть в группе")
+        assertEquals("Group-101", studentReady.group!!.groupName)
+        val studentReadyTodayPermission = mealPermissionRepository.findByStudentAndDate(studentReady, rosterWeekPolicy.today())
+        assertNotNull(studentReadyTodayPermission, "student_test должен иметь талон на текущую дату")
+        assertTrue(studentReadyTodayPermission!!.isBreakfastAllowed, "student_test должен иметь завтрак")
+        assertTrue(studentReadyTodayPermission.isLunchAllowed, "student_test должен иметь обед")
+
         val studentSick = userRepository.findByLogin("stud_Group-101_2")!!
         val studentExpelled = userRepository.findByLogin("stud_Group-101_3")!!
         val studentOther = userRepository.findByLogin("stud_Group-101_4")!!
@@ -250,6 +258,7 @@ class TestModeDemoDataInitializerTest {
         "stud_Group-101_5",
         "stud_Group-102_1",
         "stud_Group-102_2",
+        "student_test",
     )
 
     private fun demoLogins(): List<String> = listOf(
@@ -284,6 +293,7 @@ class TestModeDemoDataInitializerDisabledTest {
         assertNull(userRepository.findByLogin("chef_main"))
         assertNull(userRepository.findByLogin("registrator"))
         assertNull(userRepository.findByLogin("curator_Group-101"))
+        assertNull(userRepository.findByLogin("student_test"))
         assertTrue(mealTransactionRepository.findAllByTransactionHashStartingWith("demo_").isEmpty())
     }
 }
