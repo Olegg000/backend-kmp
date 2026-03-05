@@ -390,16 +390,22 @@ class ReportsService(
         val summaryRows = listOf(
             csvLine("ИТОГИ"),
             csvLine("Блок", "Метрика", "Значение", "Пояснение"),
-            csvLine("ПО ФАКТУ", "Завтраки (количество питаний за все дни)", totals.factBreakfastCount.toString(), "Сумма по дням"),
-            csvLine("ПО ФАКТУ", "Обеды (количество питаний за все дни)", totals.factLunchCount.toString(), "Сумма по дням"),
-            csvLine("ПО ФАКТУ", "Завтрак и обед", totals.factBothCount.toString(), "Строки, где были оба факта"),
-            csvLine("ПО ФАКТУ", "Всего питаний за все дни", totals.factMealEventsTotal.toString(), "Завтраки + обеды"),
-            csvLine("ПО ФАКТУ", "Уникальных студентов питалось", totals.factUniqueStudentsCount.toString(), "Без повторов за период"),
-            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтраки (количество назначений за все дни)", totals.plannedBreakfastCount.toString(), "Сумма по дням"),
-            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Обеды (количество назначений за все дни)", totals.plannedLunchCount.toString(), "Сумма по дням"),
-            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтрак и обед", totals.plannedBothCount.toString(), "Строки, где назначены оба приема"),
-            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Всего назначений за все дни", totals.plannedMealEventsTotal.toString(), "Завтраки + обеды"),
-            csvLine("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Уникальных студентов с назначением", totals.plannedUniqueStudentsCount.toString(), "Без повторов за период"),
+            csvLine("СВОДКА", "Куратор отметил (план): только завтрак", totals.plannedOnlyBreakfastCount.toString(), "Строки с планом только на завтрак"),
+            csvLine("СВОДКА", "Куратор отметил (план): только обед", totals.plannedOnlyLunchCount.toString(), "Строки с планом только на обед"),
+            csvLine("СВОДКА", "Куратор отметил (план): завтрак и обед", totals.plannedBothCount.toString(), "Строки с двумя планами"),
+            csvLine("СВОДКА", "Было: только завтрак", totals.usedOnlyBreakfastCount.toString(), "Только синхронизированные серверные транзакции"),
+            csvLine("СВОДКА", "Было: только обед", totals.usedOnlyLunchCount.toString(), "Только синхронизированные серверные транзакции"),
+            csvLine("СВОДКА", "Было: завтрак и обед", totals.usedBothCount.toString(), "Только синхронизированные серверные транзакции"),
+            csvLine("СВОДКА", "Куратор отметил, но факта питания нет: только завтрак", totals.plannedNoFactOnlyBreakfastCount.toString(), "План был, факт не зафиксирован"),
+            csvLine("СВОДКА", "Куратор отметил, но факта питания нет: только обед", totals.plannedNoFactOnlyLunchCount.toString(), "План был, факт не зафиксирован"),
+            csvLine("СВОДКА", "Куратор отметил, но факта питания нет: завтрак и обед", totals.plannedNoFactBothCount.toString(), "План был, факта по обоим приемам нет"),
+            csvLine("СВОДКА", "Частичный факт при плане «завтрак и обед»", totals.plannedPartialBothCount.toString(), "Есть факт только по одному из приемов"),
+            csvLine("СВОДКА", "Не отмечено куратором / иные причины", totals.notMarkedRowsCount.toString(), "Нет плана ни на завтрак, ни на обед"),
+            csvLine("СВОДКА", "Причины: отчислен", totals.reasonExpelledCount.toString(), "Количество строк"),
+            csvLine("СВОДКА", "Причины: больничный", totals.reasonSickLeaveCount.toString(), "Количество строк"),
+            csvLine("СВОДКА", "Причины: куратор не заполнил табель", totals.reasonMissingRosterCount.toString(), "Количество строк"),
+            csvLine("СВОДКА", "Причины: иное", totals.reasonOtherCount.toString(), "Количество строк"),
+            csvLine("СВОДКА", "Строк в детализации", totals.totalRowsCount.toString(), "Всего строк в отчетной таблице"),
         )
 
         return buildString {
@@ -413,37 +419,47 @@ class ReportsService(
     }
 
     internal fun calculateReportTotals(rows: List<ConsumptionReportRow>): ReportTotals {
-        val factBreakfastCount = rows.count { it.breakfastUsed }
-        val factLunchCount = rows.count { it.lunchUsed }
-        val factBothCount = rows.count { it.breakfastUsed && it.lunchUsed }
-        val factMealEventsTotal = factBreakfastCount + factLunchCount
-        val factUniqueStudentsCount = rows.asSequence()
-            .filter { it.breakfastUsed || it.lunchUsed }
-            .map { it.studentId }
-            .toSet()
-            .size
-
-        val plannedBreakfastCount = rows.count { it.plannedBreakfast }
-        val plannedLunchCount = rows.count { it.plannedLunch }
+        val plannedOnlyBreakfastCount = rows.count { it.plannedBreakfast && !it.plannedLunch }
+        val plannedOnlyLunchCount = rows.count { !it.plannedBreakfast && it.plannedLunch }
         val plannedBothCount = rows.count { it.plannedBreakfast && it.plannedLunch }
-        val plannedMealEventsTotal = plannedBreakfastCount + plannedLunchCount
-        val plannedUniqueStudentsCount = rows.asSequence()
-            .filter { it.plannedBreakfast || it.plannedLunch }
-            .map { it.studentId }
-            .toSet()
-            .size
+
+        val usedBreakfastCount = rows.count { it.breakfastUsed }
+        val usedLunchCount = rows.count { it.lunchUsed }
+        val usedBothCount = rows.count { it.breakfastUsed && it.lunchUsed }
+        val usedOnlyBreakfastCount = (usedBreakfastCount - usedBothCount).coerceAtLeast(0)
+        val usedOnlyLunchCount = (usedLunchCount - usedBothCount).coerceAtLeast(0)
+
+        val plannedNoFactOnlyBreakfastCount = rows.count { it.plannedBreakfast && !it.plannedLunch && !it.breakfastUsed }
+        val plannedNoFactOnlyLunchCount = rows.count { !it.plannedBreakfast && it.plannedLunch && !it.lunchUsed }
+        val plannedNoFactBothCount = rows.count {
+            it.plannedBreakfast && it.plannedLunch && !it.breakfastUsed && !it.lunchUsed
+        }
+        val plannedPartialBothCount = rows.count {
+            it.plannedBreakfast && it.plannedLunch && (it.breakfastUsed.xor(it.lunchUsed))
+        }
+        val notMarkedRowsCount = rows.count { !it.plannedBreakfast && !it.plannedLunch }
+        val reasonExpelledCount = rows.count { it.noMealReasonType == NoMealReasonType.EXPELLED }
+        val reasonSickLeaveCount = rows.count { it.noMealReasonType == NoMealReasonType.SICK_LEAVE }
+        val reasonMissingRosterCount = rows.count { it.noMealReasonType == NoMealReasonType.MISSING_ROSTER }
+        val reasonOtherCount = rows.count { it.noMealReasonType == NoMealReasonType.OTHER }
 
         return ReportTotals(
-            factBreakfastCount = factBreakfastCount,
-            factLunchCount = factLunchCount,
-            factBothCount = factBothCount,
-            factMealEventsTotal = factMealEventsTotal,
-            factUniqueStudentsCount = factUniqueStudentsCount,
-            plannedBreakfastCount = plannedBreakfastCount,
-            plannedLunchCount = plannedLunchCount,
+            plannedOnlyBreakfastCount = plannedOnlyBreakfastCount,
+            plannedOnlyLunchCount = plannedOnlyLunchCount,
             plannedBothCount = plannedBothCount,
-            plannedMealEventsTotal = plannedMealEventsTotal,
-            plannedUniqueStudentsCount = plannedUniqueStudentsCount,
+            usedOnlyBreakfastCount = usedOnlyBreakfastCount,
+            usedOnlyLunchCount = usedOnlyLunchCount,
+            usedBothCount = usedBothCount,
+            plannedNoFactOnlyBreakfastCount = plannedNoFactOnlyBreakfastCount,
+            plannedNoFactOnlyLunchCount = plannedNoFactOnlyLunchCount,
+            plannedNoFactBothCount = plannedNoFactBothCount,
+            plannedPartialBothCount = plannedPartialBothCount,
+            notMarkedRowsCount = notMarkedRowsCount,
+            reasonExpelledCount = reasonExpelledCount,
+            reasonSickLeaveCount = reasonSickLeaveCount,
+            reasonMissingRosterCount = reasonMissingRosterCount,
+            reasonOtherCount = reasonOtherCount,
+            totalRowsCount = rows.size,
         )
     }
 
@@ -603,14 +619,20 @@ class ReportsService(
 }
 
 internal data class ReportTotals(
-    val factBreakfastCount: Int,
-    val factLunchCount: Int,
-    val factBothCount: Int,
-    val factMealEventsTotal: Int,
-    val factUniqueStudentsCount: Int,
-    val plannedBreakfastCount: Int,
-    val plannedLunchCount: Int,
+    val plannedOnlyBreakfastCount: Int,
+    val plannedOnlyLunchCount: Int,
     val plannedBothCount: Int,
-    val plannedMealEventsTotal: Int,
-    val plannedUniqueStudentsCount: Int,
+    val usedOnlyBreakfastCount: Int,
+    val usedOnlyLunchCount: Int,
+    val usedBothCount: Int,
+    val plannedNoFactOnlyBreakfastCount: Int,
+    val plannedNoFactOnlyLunchCount: Int,
+    val plannedNoFactBothCount: Int,
+    val plannedPartialBothCount: Int,
+    val notMarkedRowsCount: Int,
+    val reasonExpelledCount: Int,
+    val reasonSickLeaveCount: Int,
+    val reasonMissingRosterCount: Int,
+    val reasonOtherCount: Int,
+    val totalRowsCount: Int,
 )

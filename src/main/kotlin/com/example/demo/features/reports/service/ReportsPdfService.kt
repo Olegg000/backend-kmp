@@ -158,17 +158,22 @@ class ReportsPdfService(
         table.addCell(headerCell("Значение"))
         table.addCell(headerCell("Пояснение"))
 
-        addRow("ПО ФАКТУ", "Завтраки (количество питаний за все дни)", totals.factBreakfastCount, "Сумма по дням")
-        addRow("ПО ФАКТУ", "Обеды (количество питаний за все дни)", totals.factLunchCount, "Сумма по дням")
-        addRow("ПО ФАКТУ", "Завтрак и обед", totals.factBothCount, "Строки, где были оба факта")
-        addRow("ПО ФАКТУ", "Всего питаний за все дни", totals.factMealEventsTotal, "Завтраки + обеды")
-        addRow("ПО ФАКТУ", "Уникальных студентов питалось", totals.factUniqueStudentsCount, "Без повторов за период")
-
-        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтраки (количество назначений за все дни)", totals.plannedBreakfastCount, "Сумма по дням")
-        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Обеды (количество назначений за все дни)", totals.plannedLunchCount, "Сумма по дням")
-        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Завтрак и обед", totals.plannedBothCount, "Строки, где назначены оба приема")
-        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Всего назначений за все дни", totals.plannedMealEventsTotal, "Завтраки + обеды")
-        addRow("ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ", "Уникальных студентов с назначением", totals.plannedUniqueStudentsCount, "Без повторов за период")
+        addRow("СВОДКА", "Куратор отметил (план): только завтрак", totals.plannedOnlyBreakfastCount, "Строки с планом только на завтрак")
+        addRow("СВОДКА", "Куратор отметил (план): только обед", totals.plannedOnlyLunchCount, "Строки с планом только на обед")
+        addRow("СВОДКА", "Куратор отметил (план): завтрак и обед", totals.plannedBothCount, "Строки с двумя планами")
+        addRow("СВОДКА", "Было: только завтрак", totals.usedOnlyBreakfastCount, "Только синхронизированные серверные транзакции")
+        addRow("СВОДКА", "Было: только обед", totals.usedOnlyLunchCount, "Только синхронизированные серверные транзакции")
+        addRow("СВОДКА", "Было: завтрак и обед", totals.usedBothCount, "Только синхронизированные серверные транзакции")
+        addRow("СВОДКА", "Куратор отметил, но факта питания нет: только завтрак", totals.plannedNoFactOnlyBreakfastCount, "План был, факт не зафиксирован")
+        addRow("СВОДКА", "Куратор отметил, но факта питания нет: только обед", totals.plannedNoFactOnlyLunchCount, "План был, факт не зафиксирован")
+        addRow("СВОДКА", "Куратор отметил, но факта питания нет: завтрак и обед", totals.plannedNoFactBothCount, "План был, факта по обоим приемам нет")
+        addRow("СВОДКА", "Частичный факт при плане «завтрак и обед»", totals.plannedPartialBothCount, "Есть факт только по одному из приемов")
+        addRow("СВОДКА", "Не отмечено куратором / иные причины", totals.notMarkedRowsCount, "Нет плана ни на завтрак, ни на обед")
+        addRow("СВОДКА", "Причины: отчислен", totals.reasonExpelledCount, "Количество строк")
+        addRow("СВОДКА", "Причины: больничный", totals.reasonSickLeaveCount, "Количество строк")
+        addRow("СВОДКА", "Причины: куратор не заполнил табель", totals.reasonMissingRosterCount, "Количество строк")
+        addRow("СВОДКА", "Причины: иное", totals.reasonOtherCount, "Количество строк")
+        addRow("СВОДКА", "Строк в детализации", totals.totalRowsCount, "Всего строк в отчетной таблице")
 
         return table
     }

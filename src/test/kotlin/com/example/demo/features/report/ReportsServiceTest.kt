@@ -346,12 +346,14 @@ class ReportsServiceTest(
         assertTrue(csv.contains("ИСП-21"))
         assertTrue(csv.contains("ИСП-22"))
         assertTrue(csv.contains("\"ИТОГИ\""))
-        assertTrue(csv.contains("\"ПО ФАКТУ\""))
-        assertTrue(csv.contains("\"ВСЕГО ДОЛЖНО БЫЛО ПИТАТЬСЯ\""))
-        assertTrue(csv.contains("Завтраки (количество питаний за все дни)\",\"2\""))
-        assertTrue(csv.contains("Уникальных студентов питалось\",\"2\""))
-        assertTrue(csv.contains("Всего назначений за все дни\",\"3\""))
-        assertTrue(csv.contains("Уникальных студентов с назначением\",\"2\""))
+        assertTrue(csv.contains("\"СВОДКА\""))
+        assertTrue(csv.contains("Куратор отметил (план): только завтрак"))
+        assertTrue(csv.contains("Куратор отметил (план): только обед"))
+        assertTrue(csv.contains("Куратор отметил (план): завтрак и обед"))
+        assertTrue(csv.contains("Было: только завтрак\",\"2\""))
+        assertTrue(csv.contains("Было: только обед\",\"0\""))
+        assertTrue(csv.contains("Было: завтрак и обед\",\"0\""))
+        assertTrue(csv.contains("Причины: куратор не заполнил табель"))
     }
 
     @Test
