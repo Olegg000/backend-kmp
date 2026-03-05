@@ -328,7 +328,7 @@ class ReportsService(
     ): String {
         val rows = generateConsumptionReport(currentLogin, startDate, endDate, groupId, assignedByRoleFilter)
         val header =
-            "Дата,ID группы,Группа,ID студента,Студент,Категория,Роль назначившего,ФИО назначившего," +
+            "Дата,ID группы,Группа,ID студента,Студент,Категория,Куратор," +
                 "План завтрак,План обед,Причина непитания,Текст причины,Период с,Период по,Комментарий," +
                 "Завтрак использован,ID транзакции завтрака,ФИО сканировавшего завтрак," +
                 "Обед использован,ID транзакции обеда,ФИО сканировавшего обед," +
@@ -341,8 +341,7 @@ class ReportsService(
                 it.studentId.toString(),
                 it.studentName,
                 it.category?.name ?: "-",
-                assignedByRoleTitleRu(it.assignedByRole),
-                it.assignedByName ?: "-",
+                buildAssignedByLabel(it.assignedByName),
                 yesNo(it.plannedBreakfast),
                 yesNo(it.plannedLunch),
                 noMealReasonTypeTitleRu(it.noMealReasonType),
@@ -371,12 +370,6 @@ class ReportsService(
         StudentCategory.MANY_CHILDREN -> "Многодетные"
     }
 
-    private fun assignedByRoleTitleRu(role: AssignedByRole?): String = when (role) {
-        null -> "-"
-        AssignedByRole.ADMIN -> "Администратор"
-        AssignedByRole.CURATOR -> "Куратор"
-    }
-
     private fun noMealReasonTypeTitleRu(reasonType: NoMealReasonType?): String = when (reasonType) {
         null -> "-"
         NoMealReasonType.EXPELLED -> "Отчислен"
@@ -390,8 +383,8 @@ class ReportsService(
         val text = reasonText?.trim().orEmpty()
         if (status == "-" && text.isBlank()) return "-"
         if (status == "-") return text
-        if (text.isBlank()) return status
-        return "$status: $text"
+        if (reasonType == NoMealReasonType.OTHER && text.isNotBlank()) return text
+        return status
     }
 
     private fun buildAbsencePeriodSummary(absenceFrom: LocalDate?, absenceTo: LocalDate?): String {
@@ -400,6 +393,9 @@ class ReportsService(
         val to = absenceTo?.toString() ?: "?"
         return "$from - $to"
     }
+
+    private fun buildAssignedByLabel(assignedByName: String?): String =
+        assignedByName?.takeIf { it.isNotBlank() } ?: "Не назначен"
 
     private fun resolveAccessibleGroups(
         roles: Set<Role>,

@@ -337,7 +337,7 @@ class ReportsServiceTest(
             assignedByRoleFilter = AssignedByRoleFilter.ALL
         )
 
-        assertTrue(csv.startsWith("Дата,ID группы,Группа,ID студента,Студент,Категория,Роль назначившего,ФИО назначившего"))
+        assertTrue(csv.startsWith("Дата,ID группы,Группа,ID студента,Студент,Категория,Куратор"))
         assertTrue(csv.contains("ID транзакции завтрака"))
         assertTrue(csv.contains("ФИО сканировавшего обед"))
         assertTrue(csv.contains("Категория (RU)"))

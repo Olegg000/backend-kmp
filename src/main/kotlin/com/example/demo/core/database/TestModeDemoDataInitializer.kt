@@ -359,7 +359,6 @@ class TestModeDemoDataInitializer(
                 isBreakfastAllowed = false,
                 isLunchAllowed = false,
                 noMealReasonType = NoMealReasonType.SICK_LEAVE,
-                noMealReasonText = "Больничный лист",
                 absenceFrom = weekStart,
                 absenceTo = weekEnd,
             )
@@ -371,7 +370,6 @@ class TestModeDemoDataInitializer(
                 isBreakfastAllowed = false,
                 isLunchAllowed = false,
                 noMealReasonType = NoMealReasonType.EXPELLED,
-                noMealReasonText = "Отчислен приказом",
             )
             seededPermissions += MealPermissionEntity(
                 date = date,

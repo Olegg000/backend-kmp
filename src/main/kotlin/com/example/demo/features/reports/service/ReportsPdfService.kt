@@ -3,7 +3,6 @@ package com.example.demo.features.reports.service
 import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.features.reports.dto.AssignedByRoleFilter
 import com.example.demo.core.database.StudentCategory
-import com.example.demo.features.reports.dto.AssignedByRole
 import com.lowagie.text.Document
 import com.lowagie.text.Font
 import com.lowagie.text.PageSize
@@ -55,7 +54,7 @@ class ReportsPdfService(
                 1.45f, // Группа
                 2.15f, // Студент
                 1.1f, // Категория
-                2.1f, // Назначил
+                2.1f, // Куратор
                 2.2f, // Статус/Причина
                 1.5f, // Период
                 1.8f, // Комментарий
@@ -75,7 +74,7 @@ class ReportsPdfService(
         table.addCell(headerCell("Группа"))
         table.addCell(headerCell("Студент"))
         table.addCell(headerCell("Категория"))
-        table.addCell(headerCell("Назначил"))
+        table.addCell(headerCell("Куратор"))
         table.addCell(headerCell("Статус/Причина"))
         table.addCell(headerCell("Период"))
         table.addCell(headerCell("Комментарий"))
@@ -94,7 +93,6 @@ class ReportsPdfService(
             table.addCell(
                 Paragraph(
                     buildAssignedByLabel(
-                        role = it.assignedByRole,
                         assignedByName = it.assignedByName
                     ),
                     fontNormal
@@ -138,12 +136,6 @@ class ReportsPdfService(
         StudentCategory.MANY_CHILDREN -> "Многодетные"
     }
 
-    private fun assignedByRoleTitleRu(role: AssignedByRole?): String = when (role) {
-        null -> "-"
-        AssignedByRole.ADMIN -> "Администратор"
-        AssignedByRole.CURATOR -> "Куратор"
-    }
-
     private fun noMealReasonTypeTitleRu(reasonType: NoMealReasonType?): String = when (reasonType) {
         null -> "-"
         NoMealReasonType.EXPELLED -> "Отчислен"
@@ -157,8 +149,8 @@ class ReportsPdfService(
         val text = reasonText?.trim().orEmpty()
         if (status == "-" && text.isBlank()) return "-"
         if (status == "-") return text
-        if (text.isBlank()) return status
-        return "$status: $text"
+        if (reasonType == NoMealReasonType.OTHER && text.isNotBlank()) return text
+        return status
     }
 
     private fun buildAbsencePeriodSummary(absenceFrom: LocalDate?, absenceTo: LocalDate?): String {
@@ -168,13 +160,6 @@ class ReportsPdfService(
         return "$from - $to"
     }
 
-    private fun buildAssignedByLabel(role: AssignedByRole?, assignedByName: String?): String {
-        val roleLabel = assignedByRoleTitleRu(role)
-        return when {
-            role == null && assignedByName.isNullOrBlank() -> "Не назначено"
-            assignedByName.isNullOrBlank() -> roleLabel
-            role == null -> assignedByName
-            else -> "$roleLabel • $assignedByName"
-        }
-    }
+    private fun buildAssignedByLabel(assignedByName: String?): String =
+        assignedByName?.takeIf { it.isNotBlank() } ?: "Не назначен"
 }
