@@ -8,11 +8,14 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
+import org.springframework.core.Ordered
+import org.springframework.core.annotation.Order
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 class BootstrapAdminInitializer(
     private val userRepository: UserRepository,
     private val groupRepository: GroupRepository,

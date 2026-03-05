@@ -21,6 +21,8 @@ interface MealTransactionRepository : JpaRepository<MealTransactionEntity, Int> 
 
     fun existsByTransactionHash(hash: String): Boolean
 
+    fun findAllByTransactionHashStartingWith(prefix: String): List<MealTransactionEntity>
+
     fun findAllByStudentAndTimeStampBetween(
         student: UserEntity,
         start: LocalDateTime,

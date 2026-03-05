@@ -25,6 +25,36 @@ Optional profile/name fields:
 
 Use `.env.example` as a template.
 
+## Test mode demo seed
+
+When `APP_TEST_MODE_ENABLED=true`, backend runs deterministic demo seeding on startup:
+
+- creates/updates legacy demo accounts;
+- sets password `password` for all demo logins;
+- seeds current + previous work week for menus/permissions;
+- seeds `demo_` transactions for QR/scanner checks;
+- keeps `Group-102` without curator to surface synthetic `MISSING_ROSTER` in reports.
+
+Demo logins:
+
+- `admin`
+- `chef_main`
+- `registrator`
+- `curator_Group-101`
+- `stud_Group-101_1`
+- `stud_Group-101_2`
+- `stud_Group-101_3`
+- `stud_Group-101_4`
+- `stud_Group-101_5`
+- `stud_Group-102_1`
+- `stud_Group-102_2`
+
+Enable in `.env`:
+
+```bash
+APP_TEST_MODE_ENABLED=true
+```
+
 ## Start / check
 
 ```bash

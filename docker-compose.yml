@@ -53,6 +53,7 @@ services:
 
       # Bootstrap super-admin (required for first login in clean DB)
       APP_BOOTSTRAP_ADMIN_ENABLED: ${APP_BOOTSTRAP_ADMIN_ENABLED:-true}
+      # Enables deterministic demo users/data seed (all demo passwords = "password")
       APP_TEST_MODE_ENABLED: ${APP_TEST_MODE_ENABLED:-false}
       BOOTSTRAP_ADMIN_LOGIN: ${BOOTSTRAP_ADMIN_LOGIN:-admin}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD is required}
