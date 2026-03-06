@@ -5,8 +5,10 @@ import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
+import com.example.demo.core.database.entity.MealPermissionEntity
 import com.example.demo.core.database.entity.UserEntity
 import com.example.demo.core.database.repository.GroupRepository
+import com.example.demo.core.database.repository.MealPermissionRepository
 import com.example.demo.core.database.repository.UserRepository
 import com.example.demo.core.security.JwtUtils
 import com.example.demo.features.auth.dto.RegistrationDto
@@ -24,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 import java.util.UUID
 
 @SpringBootTest
@@ -36,6 +39,7 @@ class RegistratorUsersControllerTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val userRepository: UserRepository,
     @Autowired private val groupRepository: GroupRepository,
+    @Autowired private val mealPermissionRepository: MealPermissionRepository,
     @Autowired private val jwtUtils: JwtUtils,
     @Autowired private val objectMapper: ObjectMapper
 ) {
@@ -240,6 +244,67 @@ class RegistratorUsersControllerTest(
 
         val exists = userRepository.findById(user.id!!).isPresent
         assert(!exists)
+    }
+
+    @Test
+    @DisplayName("DELETE удаляет пользователя даже при зависимостях в meal_permission")
+    fun `delete user removes dependent meal permissions`() {
+        val token = createAdminToken()
+        val admin = userRepository.findByLogin("admin-reg")
+            ?: error("Expected admin-reg to exist")
+
+        val victim = userRepository.save(
+            UserEntity(
+                login = "victim-with-permissions",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Жертва",
+                surname = "Тестовая",
+                fatherName = "Тестович"
+            )
+        )
+
+        val anotherStudent = userRepository.save(
+            UserEntity(
+                login = "another-student",
+                passwordHash = "hash",
+                roles = mutableSetOf(Role.STUDENT),
+                name = "Другой",
+                surname = "Студент",
+                fatherName = "Тестович"
+            )
+        )
+
+        mealPermissionRepository.save(
+            MealPermissionEntity(
+                date = LocalDate.now(),
+                student = victim,
+                assignedBy = admin,
+                reason = "Тест student ref",
+                isBreakfastAllowed = true,
+                isLunchAllowed = false,
+            )
+        )
+        mealPermissionRepository.save(
+            MealPermissionEntity(
+                date = LocalDate.now().plusDays(1),
+                student = anotherStudent,
+                assignedBy = victim,
+                reason = "Тест assignedBy ref",
+                isBreakfastAllowed = false,
+                isLunchAllowed = true,
+            )
+        )
+
+        mockMvc.perform(
+            delete("/api/v1/registrator/users/${victim.id}")
+                .header("Authorization", "Bearer $token")
+        )
+            .andExpect(status().isOk)
+
+        val exists = userRepository.findById(victim.id!!).isPresent
+        assert(!exists)
+        assert(mealPermissionRepository.findAll().isEmpty())
     }
 
     @Test

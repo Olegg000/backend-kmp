@@ -23,6 +23,7 @@ import com.example.demo.features.auth.dto.RegistrationDto
 import com.example.demo.features.auth.dto.UserCredentialsResponse
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.security.authentication.AuthenticationManager
@@ -42,6 +43,7 @@ class UserServiceQ(
     private val passwordEncoder: PasswordEncoder,
     private val groupRepository: GroupRepository,
     private val passwordResetLogRepository: PasswordResetLogRepository,
+    private val jdbcTemplate: JdbcTemplate,
     private val businessClock: Clock,
     @Value("\${app.test-mode.enabled:false}")
     private val testModeEnabled: Boolean,
@@ -476,7 +478,30 @@ class UserServiceQ(
             )
         }
 
+        deleteUserDependencies(userId)
         userRepository.delete(user)
+    }
+
+    private fun deleteUserDependencies(userId: UUID) {
+        jdbcTemplate.update("UPDATE users SET expelled_by_id = NULL WHERE expelled_by_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM meal_permission WHERE student_id = ? OR assigned_by_id = ?", userId, userId)
+        jdbcTemplate.update("DELETE FROM meal_transaction WHERE student_id = ? OR chef_id = ?", userId, userId)
+        jdbcTemplate.update(
+            "DELETE FROM suspicious_transaction WHERE student_id = ? OR chef_id = ? OR resolved_by_id = ?",
+            userId,
+            userId,
+            userId,
+        )
+        jdbcTemplate.update("DELETE FROM notifications WHERE user_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM notification_dispatch_log WHERE user_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM password_reset_log WHERE user_id = ? OR reset_by_id = ?", userId, userId)
+        jdbcTemplate.update("DELETE FROM curator_week_submission WHERE curator_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM curator_week_audit WHERE curator_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM chef_week_confirmation WHERE chef_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM group_curators WHERE curator_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM push_device_token WHERE user_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM user_notification_settings WHERE user_id = ?", userId)
+        jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", userId)
     }
 
     fun listUsers(role: Role?, groupId: Int?, search: String?): List<AdminUserDto> {
