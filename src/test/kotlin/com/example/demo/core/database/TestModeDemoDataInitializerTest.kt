@@ -151,6 +151,7 @@ class TestModeDemoDataInitializerTest {
         val beforeMenu = countSeededMenuRows(seedStart, seedEnd)
 
         val admin = userRepository.findByLogin("admin")!!
+        val studentTest = userRepository.findByLogin("student_test")!!
         val today = rosterWeekPolicy.today()
         val beforeAdminTodayPermissions = mealPermissionRepository.findAllByStudentInAndDateBetween(
             listOf(admin),
@@ -162,6 +163,15 @@ class TestModeDemoDataInitializerTest {
         assertNotNull(beforeAdminTodayPermission)
         assertTrue(beforeAdminTodayPermission.isBreakfastAllowed)
         assertTrue(beforeAdminTodayPermission.isLunchAllowed)
+        val beforeStudentTodayPermissions = mealPermissionRepository.findAllByStudentInAndDateBetween(
+            listOf(studentTest),
+            today,
+            today,
+        )
+        assertEquals(1, beforeStudentTodayPermissions.size)
+        val beforeStudentTodayPermission = beforeStudentTodayPermissions.single()
+        assertTrue(beforeStudentTodayPermission.isBreakfastAllowed)
+        assertTrue(beforeStudentTodayPermission.isLunchAllowed)
 
         initializer.run(DefaultApplicationArguments())
 
@@ -178,6 +188,11 @@ class TestModeDemoDataInitializerTest {
             today,
             today,
         )
+        val afterStudentTodayPermissions = mealPermissionRepository.findAllByStudentInAndDateBetween(
+            listOf(studentTest),
+            today,
+            today,
+        )
 
         assertEquals(beforeUsers, afterUsers)
         assertEquals(beforePermissions, afterPermissions)
@@ -187,6 +202,10 @@ class TestModeDemoDataInitializerTest {
         val afterAdminTodayPermission = afterAdminTodayPermissions.single()
         assertTrue(afterAdminTodayPermission.isBreakfastAllowed)
         assertTrue(afterAdminTodayPermission.isLunchAllowed)
+        assertEquals(1, afterStudentTodayPermissions.size)
+        val afterStudentTodayPermission = afterStudentTodayPermissions.single()
+        assertTrue(afterStudentTodayPermission.isBreakfastAllowed)
+        assertTrue(afterStudentTodayPermission.isLunchAllowed)
     }
 
     @Test
