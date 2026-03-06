@@ -66,6 +66,13 @@ class CuratorStudentService(
                 status = HttpStatus.FORBIDDEN,
             )
         }
+        if (student.accountStatus == AccountStatus.FROZEN_EXPELLED) {
+            throw BusinessException(
+                code = "STUDENT_FROZEN_EXPELLED",
+                userMessage = "Студент отчислен и заморожен. Изменение категории запрещено.",
+                status = HttpStatus.CONFLICT,
+            )
+        }
 
         student.studentCategory = request.studentCategory
         val saved = userRepository.save(student)
@@ -112,7 +119,8 @@ class CuratorStudentService(
                     fullName = "${it.surname} ${it.name} ${it.fatherName}",
                     groupId = it.group!!.id!!,
                     groupName = it.group!!.groupName,
-                    studentCategory = it.studentCategory
+                    studentCategory = it.studentCategory,
+                    accountStatus = it.accountStatus,
                 )
             }
             .sortedWith(compareBy({ it.groupName }, { it.fullName }))

@@ -2,6 +2,7 @@ package com.example.demo.features.curator
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.config.TimeConfig
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
 import com.example.demo.core.database.entity.GroupEntity
@@ -150,5 +151,35 @@ class CuratorStudentServiceTest(
 
         assertTrue(row != null)
         assertEquals(null, row?.studentCategory)
+    }
+
+    @Test
+    @DisplayName("Куратор не может менять категорию отчисленного студента")
+    fun `curator cannot update category of expelled student`() {
+        studentGroup1.accountStatus = AccountStatus.FROZEN_EXPELLED
+        userRepository.save(studentGroup1)
+
+        val ex = assertThrows(BusinessException::class.java) {
+            curatorStudentService.updateStudentCategory(
+                curatorLogin = curator1.login,
+                studentId = studentGroup1.id!!,
+                request = CuratorStudentCategoryUpdateRequest(StudentCategory.SVO)
+            )
+        }
+
+        assertEquals("STUDENT_FROZEN_EXPELLED", ex.code)
+    }
+
+    @Test
+    @DisplayName("Список студентов куратора возвращает accountStatus для отчисленного")
+    fun `list students includes expelled account status`() {
+        studentGroup1.accountStatus = AccountStatus.FROZEN_EXPELLED
+        userRepository.save(studentGroup1)
+
+        val rows = curatorStudentService.listMyStudents(curator1.login)
+        val row = rows.firstOrNull { it.userId == studentGroup1.id }
+
+        assertTrue(row != null)
+        assertEquals(AccountStatus.FROZEN_EXPELLED, row?.accountStatus)
     }
 }

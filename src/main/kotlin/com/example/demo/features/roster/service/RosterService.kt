@@ -101,6 +101,7 @@ class RosterService(
                 studentId = student.id!!,
                 fullName = "${student.surname} ${student.name}",
                 studentCategory = student.studentCategory,
+                accountStatus = student.accountStatus,
                 days = daysDto
             )
         }

@@ -1,5 +1,6 @@
 package com.example.demo.features.roster.dto
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.StudentCategory
 import jakarta.validation.Valid
@@ -13,6 +14,7 @@ data class StudentRosterRow(
     val studentId: UUID,
     val fullName: String,
     val studentCategory: StudentCategory?,
+    val accountStatus: AccountStatus,
     val days: List<DayPermissionDto>
 )
 

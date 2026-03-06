@@ -1,5 +1,6 @@
 package com.example.demo.features.curator.dto
 
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.StudentCategory
 import java.time.LocalDate
@@ -14,7 +15,8 @@ data class CuratorStudentRow(
     val fullName: String,
     val groupId: Int,
     val groupName: String,
-    val studentCategory: StudentCategory?
+    val studentCategory: StudentCategory?,
+    val accountStatus: AccountStatus
 )
 
 data class CuratorStudentAbsenceRequest(

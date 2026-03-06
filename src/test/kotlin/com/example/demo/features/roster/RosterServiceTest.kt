@@ -2,6 +2,7 @@ package com.example.demo.features.roster
 
 import com.example.demo.config.TestProfileResolver
 import com.example.demo.config.TimeConfig
+import com.example.demo.core.database.AccountStatus
 import com.example.demo.core.database.NoMealReasonType
 import com.example.demo.core.database.Role
 import com.example.demo.core.database.StudentCategory
@@ -248,5 +249,39 @@ class RosterServiceTest {
         }
 
         assertEquals("ROSTER_ONLY_NEXT_WEEK_OR_LATER", ex.code)
+    }
+
+    @Test
+    @DisplayName("Табель возвращает отчисленного студента со статусом FROZEN_EXPELLED")
+    fun `get roster should include expelled student with account status`() {
+        student2.accountStatus = AccountStatus.FROZEN_EXPELLED
+        userRepository.save(student2)
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+
+        val roster = rosterService.getRosterForGroup(curator.login, nextMonday)
+        val expelledRow = roster.firstOrNull { it.studentId == student2.id }
+
+        assertNotNull(expelledRow)
+        assertEquals(AccountStatus.FROZEN_EXPELLED, expelledRow?.accountStatus)
+    }
+
+    @Test
+    @DisplayName("Нельзя обновить табель для отчисленного студента")
+    fun `update roster for expelled student should be forbidden`() {
+        student1.accountStatus = AccountStatus.FROZEN_EXPELLED
+        userRepository.save(student1)
+        val nextMonday = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+        val request = UpdateRosterRequest(
+            studentId = student1.id!!,
+            permissions = listOf(
+                DayPermissionDto(nextMonday, isBreakfast = true, isLunch = false, reason = "Тест")
+            )
+        )
+
+        val ex = assertThrows(BusinessException::class.java) {
+            rosterService.updateRoster(request, curator.login)
+        }
+
+        assertEquals("STUDENT_FROZEN_EXPELLED", ex.code)
     }
 }
